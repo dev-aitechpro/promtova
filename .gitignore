@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# --- Graphify knowledge graph ---
+# Commit graph.json (persistent queryable graph) and GRAPH_REPORT.md.
+# Everything below is generated cache / absolute-path artifact and must NOT be committed.
+
+.graphify/cache/
+.graphify/description-instructions/
+.graphify/label-instructions/
+.graphify/studio/
+.graphify/.graphify_*.json
+.graphify/manifest.json
+.graphify/needs_update
+.graphify/branch.json
+.graphify/worktree.json
+.graphify/cost.json
