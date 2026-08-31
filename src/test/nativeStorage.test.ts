@@ -57,6 +57,7 @@ describe('nativeStorage — маппинг в window.promtova.stores (§2.3)', (
       stores: { get, set, remove },
       file: {} as PromtovaApi['file'],
       app: {} as PromtovaApi['app'],
+      catalog: {} as PromtovaApi['catalog'],
     };
     (window as unknown as { promtova?: PromtovaApi }).promtova = api;
     return api;
@@ -90,6 +91,7 @@ describe('nativeStorage — маппинг в window.promtova.stores (§2.3)', (
       stores: {} as PromtovaApi['stores'],
       file: {} as PromtovaApi['file'],
       app: { dataPath: 'C:\\Users\\x\\AppData\\Roaming\\Promtova\\stores.json' } as PromtovaApi['app'],
+      catalog: {} as PromtovaApi['catalog'],
     };
     (window as unknown as { promtova?: PromtovaApi }).promtova = api;
     expect(getDataPath()).toBe('C:\\Users\\x\\AppData\\Roaming\\Promtova\\stores.json');
@@ -110,6 +112,7 @@ describe('nativeStorage — маппинг в window.promtova.stores (§2.3)', (
       },
       file: {} as PromtovaApi['file'],
       app: {} as PromtovaApi['app'],
+      catalog: {} as PromtovaApi['catalog'],
     };
     (window as unknown as { promtova?: PromtovaApi }).promtova = api;
 

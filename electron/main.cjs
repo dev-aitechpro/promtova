@@ -3,7 +3,7 @@
 // Загружает single-file сборку renderer (dist/index.html) и держит весь доступ к диску.
 
 const path = require('path');
-const { app, BrowserWindow, dialog, session, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, session, ipcMain, shell, net } = require('electron');
 
 const { createStore, registerStoreHandlers } = require('./storeService.cjs');
 const { registerFileHandlers } = require('./fileService.cjs');
@@ -116,6 +116,31 @@ app.whenReady().then(async () => {
   ipcMain.handle('app:openExternal', (_event, url) => {
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
     return shell.openExternal(url);
+  });
+
+  // Каталог промтов из репозитория. Скачиваем в main-процессе: renderer не может
+  // fetch за пределы CSP ('connect-src self'), а main не ограничен.
+  ipcMain.handle('catalog:fetch', async () => {
+    const url =
+      'https://raw.githubusercontent.com/dev-aitechpro/promtova/main/community-prompts.json';
+    try {
+      const text = await new Promise((resolve, reject) => {
+        const request = net.request(url);
+        request.on('response', (response) => {
+          let body = '';
+          response.on('data', (chunk) => (body += chunk.toString()));
+          response.on('end', () => {
+            if (response.statusCode >= 200 && response.statusCode < 300) resolve(body);
+            else reject(new Error(`HTTP ${response.statusCode}`));
+          });
+        });
+        request.on('error', reject);
+        request.end();
+      });
+      return { ok: true, text };
+    } catch (error) {
+      return { ok: false, error: (error && error.message) || String(error) };
+    }
   });
 
   await createWindow();

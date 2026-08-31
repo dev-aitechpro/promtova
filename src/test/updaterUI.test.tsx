@@ -32,6 +32,7 @@ const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: Re
   (window as unknown as { promtova: PromtovaApi }).promtova = {
     stores: {} as PromtovaApi['stores'],
     file: {} as PromtovaApi['file'],
+    catalog: {} as PromtovaApi['catalog'],
     app: api,
   };
   return { emit, installUpdate };

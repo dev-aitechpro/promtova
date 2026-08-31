@@ -9,10 +9,11 @@ import { parseImportFile } from '../utils/importExport';
 import { isElectron, openTextFile } from '../utils/fileBridge';
 import { folderNameById, getFolderIcon, getSiblings } from '../utils/folders';
 import { FOCUS_SEARCH_EVENT } from '../hooks/useGlobalHotkeys';
+import { fetchCommunityCatalog } from '../utils/communityCatalog';
 import type { Folder } from '../shared/types';
 import {
   Plus, Search, Star, Settings, Download, Upload, FileText, X, Sparkles, Hash,
-  Keyboard, Folder as FolderIcon, ArrowUp, ArrowDown, ChevronRight, Send,
+  Keyboard, Folder as FolderIcon, ArrowUp, ArrowDown, ChevronRight, Send, CloudDownload,
 } from 'lucide-react';
 import { openExternal } from '../utils/openExternal';
 
@@ -104,6 +105,22 @@ const Sidebar = () => {
     } catch {
       pushToast({ type: 'error', message: 'Ошибка чтения файла' });
     }
+  };
+
+  /** Обновление базы промтов из репозитория: скачать → разобрать → открыть merge (выбор «загрузить/отказаться»). */
+  const handleUpdateCatalog = async () => {
+    const text = await fetchCommunityCatalog();
+    if (!text) {
+      pushToast({ type: 'error', message: 'Не удалось загрузить базу промтов' });
+      return;
+    }
+    const parsed = parseImportFile(text, 'Development');
+    if (parsed.prompts.length === 0) {
+      pushToast({ type: 'error', message: 'В базе нет новых промтов' });
+      return;
+    }
+    // MergeModal покажет количество и даст выбрать действия; наработки не удаляются.
+    openMerge(parsed);
   };
 
   // ============ Дерево папок (§3, §7.1) ============
@@ -251,7 +268,7 @@ const Sidebar = () => {
               Промтовая
             </span>
             <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-              v1.2.0 · MIT
+              v1.2.1 · MIT
             </span>
           </div>
         </div>
@@ -399,6 +416,7 @@ const Sidebar = () => {
       >
         <IconButton title="Настройки" onClick={openSettings}><Settings size={15} /></IconButton>
         <IconButton title="Импорт" onClick={handleImportClick}><Upload size={15} /></IconButton>
+        <IconButton title="Обновить базу промтов" onClick={handleUpdateCatalog}><CloudDownload size={15} /></IconButton>
         <IconButton title="Экспорт" onClick={openExport}><Download size={15} /></IconButton>
         <IconButton title="Горячие клавиши" onClick={openShortcuts}><Keyboard size={15} /></IconButton>
         <IconButton title="Telegram @dev_aitech" onClick={() => openExternal('https://t.me/dev_aitech')}><Send size={15} /></IconButton>

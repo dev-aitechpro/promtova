@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('promtova', {
     writeText: (filePath, content) => ipcRenderer.invoke('file:writeText', filePath, content),
   },
 
+  catalog: {
+    fetch: () => ipcRenderer.invoke('catalog:fetch'),
+  },
+
   app: {
     isElectron: true,
     dataPath: info.dataPath || null,

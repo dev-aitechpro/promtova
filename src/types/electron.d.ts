@@ -46,6 +46,15 @@ export interface NativeFileApi {
   writeText(filePath: string, content: string): Promise<void>;
 }
 
+export type CatalogFetchResult =
+  | { ok: true; text: string }
+  | { ok: false; error: string };
+
+export interface NativeCatalogApi {
+  /** Скачивает каталог промтов из репозитория через main-процесс. */
+  fetch(): Promise<CatalogFetchResult>;
+}
+
 export interface NativeAppApi {
   isElectron: boolean;
   /** Абсолютный путь к файлу данных (в Electron) или null в веб-режиме. */
@@ -60,6 +69,7 @@ export interface NativeAppApi {
 export interface PromtovaApi {
   stores: NativeStoresApi;
   file: NativeFileApi;
+  catalog: NativeCatalogApi;
   app: NativeAppApi;
 }
 

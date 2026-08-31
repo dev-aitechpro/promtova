@@ -223,7 +223,7 @@ const SettingsModal = () => {
           className="rounded-md border p-3 text-[11px]"
           style={{ background: 'var(--bg-panel)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}
         >
-          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.2.0 · MIT License<br />
+          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.2.1 · MIT License<br />
           © Pavel K. / Neurocode · {new Date().getFullYear()}
           <div className="mt-2 flex items-center gap-3">
             <button
