@@ -89,7 +89,7 @@
       "uninstallerIcon": "build/icon.ico",
       "shortcutName": "Промтовая",
       "uninstallDisplayName": "Промтовая",
-      "artifactName": "${productName}-Setup-${version}.exe"
+      "artifactName": "Promtova-Setup-${version}.exe"
     },
     "publish": {
       "provider": "github",
