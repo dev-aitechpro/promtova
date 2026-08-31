@@ -93,8 +93,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "CHANGE_ME_OWNER",
-      "repo": "CHANGE_ME_REPO",
+      "owner": "dev-aitechpro",
+      "repo": "promtova",
       "releaseType": "release"
     }
   }
