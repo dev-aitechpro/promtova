@@ -268,7 +268,7 @@ const Sidebar = () => {
               Промтовая
             </span>
             <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-              v1.2.1 · MIT
+              v1.2.2 · MIT
             </span>
           </div>
         </div>

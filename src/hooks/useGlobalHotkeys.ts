@@ -36,6 +36,7 @@ export const useGlobalHotkeys = () => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
+      const inField = isEditable(e.target);
 
       // Esc — закрыть контекстные меню и верхнюю модалку
       if (e.key === 'Escape') {
@@ -44,8 +45,9 @@ export const useGlobalHotkeys = () => {
         return;
       }
 
-      // F2 — переименовать выбранный промпт
+      // F2 — переименовать выбранный промпт (не срабатывает во время набора текста)
       if (e.key === 'F2') {
+        if (inField) return;
         const { selectedPromptId } = usePromtovaStore.getState();
         if (selectedPromptId) {
           e.preventDefault();
@@ -55,6 +57,10 @@ export const useGlobalHotkeys = () => {
       }
 
       if (!mod) return;
+
+      // Во всех полях ввода не перехватываем глобальные хоткеи — иначе
+      // блокируется набор текста, выделение, курсор (особенно в Electron)
+      if (inField) return;
 
       // ⌘K / ⌘F — фокус на поиске
       if (key === 'k' || key === 'f') {
@@ -87,7 +93,6 @@ export const useGlobalHotkeys = () => {
 
       // ⌘C / ⌘⇧C — копировать без/с подстановкой переменных (§7.2)
       if (key === 'c') {
-        if (isEditable(e.target)) return; // не мешаем нативному копированию из полей
         e.preventDefault();
         const s = usePromtovaStore.getState();
         const p = s.prompts.find((x) => x.id === s.selectedPromptId);

@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Button from './ui/Button';
 import { IconButton } from './ui/Button';
 import { usePromtovaStore, useUIStore } from '../store/usePromtovaStore';
 import { extractVariables, fuzzyMatch, formatRelative, getPromptText } from '../utils/promtova';
-import { folderNameById } from '../utils/folders';
+import { folderNameById, folderPath } from '../utils/folders';
 import type { Prompt } from '../shared/types';
-import { Plus, Star, FileText, X, Check, Zap, ArrowUpDown, Pencil } from 'lucide-react';
+import { Plus, Star, FileText, X, Check, Zap, ArrowUpDown, Pencil, Type, FolderInput } from 'lucide-react';
+import { copyToClipboard } from '../utils/copy';
 
 // =============== Prompt List ===============
 const PromptList = () => {
@@ -24,6 +25,23 @@ const PromptList = () => {
   } = usePromtovaStore();
   const { pushToast, openRenamePrompt } = useUIStore();
   const [sortOpen, setSortOpen] = useState(false);
+  const sortWrapRef = useRef<HTMLDivElement>(null);
+
+  // Закрытие дропдауна сортировки по клику вне — без полноэкранного overlay,
+  // который ранее блокировал клики по редактору
+  useEffect(() => {
+    if (!sortOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (sortWrapRef.current && !sortWrapRef.current.contains(e.target as Node)) setSortOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSortOpen(false); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [sortOpen]);
 
   const filtered = useMemo(() => {
     let res = prompts;
@@ -83,13 +101,11 @@ const PromptList = () => {
               {filtered.length} {filtered.length === 1 ? 'промпт' : filtered.length < 5 ? 'промпта' : 'промптов'}
             </p>
           </div>
-          <div className="relative">
+          <div className="relative" ref={sortWrapRef}>
             <IconButton title="Сортировка" onClick={() => setSortOpen((v) => !v)}>
               <ArrowUpDown size={14} />
             </IconButton>
             {sortOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
                 <div
                   className="animate-slide-down absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-lg border"
                   style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-primary)', boxShadow: 'var(--shadow-md)' }}
@@ -118,7 +134,6 @@ const PromptList = () => {
                     </button>
                   ))}
                 </div>
-              </>
             )}
           </div>
         </div>
@@ -182,7 +197,12 @@ const PromptList = () => {
                 size="md"
                 className="mt-4"
                 onClick={() => {
-                  const id = usePromtovaStore.getState().createPrompt();
+                  const s = usePromtovaStore.getState();
+                  const target =
+                    s.selectedFolderId === 'all' || s.selectedFolderId === 'starred'
+                      ? 'Development'
+                      : folderNameById(s.folders, s.selectedFolderId) ?? 'Development';
+                  const id = s.createPrompt(target);
                   selectPrompt(id);
                 }}
               >
@@ -300,6 +320,19 @@ const PromptCard = ({
             <Pencil size={12} />
           </button>
           <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              const ok = await copyToClipboard(prompt.title);
+              useUIStore.getState().pushToast({ type: ok ? 'success' : 'error', message: ok ? 'Название скопировано' : 'Не удалось скопировать' });
+            }}
+            className="rounded p-1"
+            style={{ color: 'var(--text-muted)' }}
+            title="Копировать название"
+            aria-label="Копировать название"
+          >
+            <Type size={12} />
+          </button>
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
@@ -318,6 +351,25 @@ const PromptCard = ({
       >
         {prompt.preview || prompt.content.slice(0, 100)}
       </p>
+      {/* Переместить в папку */}
+      <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <FolderInput size={10} style={{ color: 'var(--text-muted)' }} />
+        <select
+          value={prompt.folder}
+          onChange={(e) => {
+            usePromtovaStore.getState().movePromptToFolder(prompt.id, e.target.value);
+            useUIStore.getState().pushToast({ type: 'success', message: `Перемещён в «${e.target.value}»` });
+          }}
+          aria-label="Переместить в папку"
+          title="Переместить в папку"
+          className="max-w-[130px] rounded border px-1 py-0.5 text-[10px] outline-none"
+          style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}
+        >
+          {usePromtovaStore.getState().folders.map((f) => (
+            <option key={f.id} value={f.name}>{folderPath(usePromtovaStore.getState().folders, f.id)}</option>
+          ))}
+        </select>
+      </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1">
           {prompt.tags.slice(0, 3).map((t) => (

@@ -107,6 +107,9 @@ interface PromtovaState {
     incomingFolders: Folder[],
   ) => { foldersCreated: number; imported: number; skipped: number; replaced: number };
 
+  // Перемещение промпта между папками
+  movePromptToFolder: (id: PromptId, folderName: string) => void;
+
   // Теги
   toggleTagFilter: (tag: string) => void;
   clearTagFilters: () => void;
@@ -384,31 +387,126 @@ export const usePromtovaStore = create<PromtovaState>()(
         const s = get();
         const merged = applyMerge(s.prompts, incoming, conflicts);
 
-        // папки: создаём отсутствующие (§5.2)
-        const existingNames = new Set(s.folders.map((f) => f.name));
-        const toCreate = incomingFolders.filter((f) => !existingNames.has(f.name));
-        let folders = s.folders;
-        if (toCreate.length) {
-          let nextOrder = getSiblings(s.folders, null).length;
-          folders = normalizeFolders([
-            ...s.folders,
-            ...toCreate.map((f) => ({
-              ...f,
-              id: f.id && !s.folders.some((x) => x.id === f.id) ? f.id : newId(),
-              parent: null as string | null,
-              children: [] as string[],
-              order: nextOrder++,
-            })),
-          ]);
+        // папки: создаём отсутствующие с сохранением иерархии (§5.2)
+        // + автосоздание категорий из путей вида "A/B/C" в prompt.folder
+        const folders: Folder[] = [...s.folders];
+        const existingByName = new Map(s.folders.map((f) => [f.name, f]));
+        const existingIds = new Set(s.folders.map((f) => f.id));
+
+        // собрать все имена категорий, которые должны существовать
+        const requiredNames = new Map<string, { fullPath: string; parentName: string | null }>();
+        const addPath = (fullPath: string) => {
+          const parts = fullPath.split('/').map((p) => p.trim()).filter(Boolean);
+          let acc = '';
+          let parentName: string | null = null;
+          for (const part of parts) {
+            acc = acc ? `${acc}/${part}` : part;
+            if (!requiredNames.has(part) && !existingByName.has(part)) {
+              requiredNames.set(part, { fullPath: part, parentName });
+            }
+            // для иерархических имён: parent = предыдущий сегмент
+            // но если папка уже есть или будет создана, связь установим позже
+            parentName = part;
+          }
+        };
+        // из явного списка папок
+        incomingFolders.forEach((f) => {
+          if (!existingByName.has(f.name) && !requiredNames.has(f.name)) {
+            const parentName = f.parent ? incomingFolders.find((p) => p.id === f.parent)?.name ?? null : null;
+            requiredNames.set(f.name, { fullPath: f.name, parentName });
+          }
+        });
+        // из путей промптов (например "Dev/Sub" без entries в folders)
+        incoming.forEach((p) => {
+          if (p.folder) addPath(p.folder);
+        });
+
+        // упорядочить по глубине (родители перед детьми)
+        const depthOf = (name: string): number => {
+          const info = requiredNames.get(name);
+          if (!info || !info.parentName) return 0;
+          // если родитель тоже в requiredNames — рекурсивно
+          if (requiredNames.has(info.parentName)) return 1 + depthOf(info.parentName);
+          return 1;
+        };
+        const toCreateNames = [...requiredNames.keys()].sort((a, b) => depthOf(a) - depthOf(b));
+
+        // карта: имя -> id (созданные + существующие)
+        const nameToId = new Map<string, string>();
+        s.folders.forEach((f) => nameToId.set(f.name, f.id));
+
+        let created = 0;
+        for (const name of toCreateNames) {
+          if (existingByName.has(name)) continue;
+          const info = requiredNames.get(name)!;
+          // найти id родителя (уже должен быть в nameToId, если создан ранее)
+          let parentId: string | null = null;
+          if (info.parentName) {
+            parentId = nameToId.get(info.parentName) ?? null;
+            // если родитель — часть пути "A/B", а B ещё не создан, parentName уже резолвлен выше
+          }
+          // также пробуем взять parent из исходного incomingFolders для точного соответствия
+          const src = incomingFolders.find((f) => f.name === name);
+          if (src?.parent && !parentId) {
+            const parentName2 = incomingFolders.find((p) => p.id === src.parent)?.name ?? null;
+            if (parentName2) parentId = nameToId.get(parentName2) ?? null;
+          }
+          const id = src?.id && !existingIds.has(src.id) && !nameToId.has(src.id) ? src.id : newId();
+          const order = getSiblings(folders, parentId).length;
+          const nf: Folder = {
+            id,
+            name,
+            parent: parentId,
+            children: [],
+            icon: src?.icon ?? 'Folder',
+            color: src?.color ?? '#FF6B35',
+            order,
+          };
+          folders.push(nf);
+          nameToId.set(name, id);
+          existingIds.add(id);
+          created++;
         }
 
-        set({ prompts: merged.prompts, folders, tags: recomputeTags(merged.prompts) });
+        // если были вложенные папки из incomingFolders, которые уже существовали по имени,
+        // но их parent связь теперь известна — обновляем parent (только если ранее был null и теперь есть родитель)
+        const finalFolders = normalizeFolders(folders);
+
+        set({ prompts: merged.prompts, folders: finalFolders, tags: recomputeTags(merged.prompts) });
         return {
-          foldersCreated: toCreate.length,
+          foldersCreated: created,
           imported: merged.imported,
           skipped: merged.skipped,
           replaced: merged.replaced,
         };
+      },
+
+      movePromptToFolder: (id, folderName) => {
+        const clean = folderName.trim();
+        if (!clean) return;
+        const s = get();
+        // создаём папку-получатель на лету, если её ещё нет (корневой уровень)
+        let folders = s.folders;
+        if (!s.folders.some((f) => f.name === clean)) {
+          const nf: Folder = {
+            id: newId(),
+            name: clean,
+            parent: null,
+            children: [],
+            icon: 'Folder',
+            color: '#FF6B35',
+            order: getSiblings(s.folders, null).length,
+          };
+          folders = normalizeFolders([...s.folders, nf]);
+        }
+        set((st) => ({
+          folders,
+          prompts: st.prompts.map((p) =>
+            p.id === id
+              ? { ...p, folder: clean, path: `${clean}/${p.title}`, updatedAt: new Date().toISOString() }
+              : p,
+          ),
+        }));
       },
 
       // ============ Теги ============

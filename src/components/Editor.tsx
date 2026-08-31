@@ -4,13 +4,15 @@ import { IconButton } from './ui/Button';
 import { usePromtovaStore, useUIStore } from '../store/usePromtovaStore';
 import { substituteVariables, extractVariables, renderMarkdown, formatRelative, countWords, countChars, getPromptText } from '../utils/promtova';
 import { copyToClipboard, promptTextForCopy } from '../utils/copy';
-import { Tag as TagIcon, Plus, Star, Eye, Pencil, Save, Copy, CopyPlus, Trash2, ChevronRight, X, Check, Sparkles, Hash, Keyboard, Folder, Zap, Palette, Layers, ArrowLeft, FileCode2 } from 'lucide-react';
+import { folderNameById, folderPath } from '../utils/folders';
+import { Tag as TagIcon, Plus, Star, Eye, Pencil, Save, Copy, CopyPlus, Trash2, ChevronRight, X, Check, Sparkles, Hash, Keyboard, Folder, Zap, Palette, Layers, ArrowLeft, FileCode2, Type, FolderInput } from 'lucide-react';
 
 // =============== Editor ===============
 const Editor = () => {
   const {
     selectedPromptId,
     prompts,
+    folders,
     editorMode,
     setEditorMode,
     updatePrompt,
@@ -22,6 +24,7 @@ const Editor = () => {
     incrementUsage,
     setVar,
     pruneVars,
+    movePromptToFolder,
     autosave,
     editorFontSize,
     addTagToPrompt,
@@ -75,8 +78,13 @@ const Editor = () => {
             variant="primary"
             size="md"
             onClick={() => {
-              const id = usePromtovaStore.getState().createPrompt();
-              usePromtovaStore.getState().selectPrompt(id);
+              const s = usePromtovaStore.getState();
+              const target =
+                s.selectedFolderId === 'all' || s.selectedFolderId === 'starred'
+                  ? 'Development'
+                  : folderNameById(s.folders, s.selectedFolderId) ?? 'Development';
+              const id = s.createPrompt(target);
+              s.selectPrompt(id);
             }}
           >
             <Plus size={14} /> Новый промпт
@@ -163,6 +171,11 @@ const Editor = () => {
     }
   };
 
+  const handleCopyTitle = async () => {
+    const ok = await copyToClipboard(prompt.title);
+    pushToast({ type: ok ? 'success' : 'error', message: ok ? 'Название скопировано' : 'Не удалось скопировать' });
+  };
+
   const handleSave = () => {
     markSaved();
     pushToast({ type: 'success', message: 'Сохранено' });
@@ -208,11 +221,29 @@ const Editor = () => {
               {prompt.title}
             </h1>
           )}
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
             <Folder size={11} />
             <span>{prompt.folder}</span>
             <ChevronRight size={10} />
             <span className="truncate">{prompt.title}</span>
+            <span className="mx-1 h-3 w-px" style={{ background: 'var(--border-subtle)' }} />
+            <FolderInput size={11} />
+            <select
+              value={prompt.folder}
+              onChange={(e) => {
+                movePromptToFolder(prompt.id, e.target.value);
+                pushToast({ type: 'success', message: `Перемещён в «${e.target.value}»` });
+                setDirty(true);
+              }}
+              aria-label="Переместить в папку"
+              title="Переместить в папку"
+              className="max-w-[160px] rounded border px-1.5 py-0.5 text-[11px] outline-none"
+              style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', borderColor: 'var(--border-subtle)' }}
+            >
+              {folders.map((f) => (
+                <option key={f.id} value={f.name}>{folderPath(folders, f.id)}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -304,6 +335,9 @@ const Editor = () => {
 
           <div className="mx-1 h-5 w-px" style={{ background: 'var(--border-subtle)' }} />
 
+          <IconButton title="Копировать название" onClick={handleCopyTitle}>
+            <Type size={14} />
+          </IconButton>
           <Button variant="secondary" size="sm" onClick={() => { duplicatePrompt(prompt.id); pushToast({ type: 'info', message: 'Создана копия' }); }}>
             <CopyPlus size={13} /> Копия
           </Button>
