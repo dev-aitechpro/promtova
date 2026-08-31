@@ -2,8 +2,8 @@ import { useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { usePromtovaStore, useUIStore } from '../../store/usePromtovaStore';
-import { downloadFile } from '../../utils/promtova';
 import { buildExportData } from '../../utils/importExport';
+import { saveTextFile } from '../../utils/fileBridge';
 import { folderNameById, folderPath, getDescendantIds } from '../../utils/folders';
 import type { ExportData, Folder } from '../../shared/types';
 import { Download } from 'lucide-react';
@@ -18,7 +18,7 @@ const ExportModal = () => {
   const folderSelName = folderNameById(folders, folderSel) ?? '';
   const folderCount = prompts.filter((p) => p.folder === folderSelName).length;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let data: typeof prompts;
     let foldersOut: Folder[] = [];
 
@@ -43,7 +43,9 @@ const ExportModal = () => {
           ? `promtova-${folderSelName || 'folder'}-${new Date().toISOString().slice(0, 10)}.prmt`
           : `${selectedPrompt?.title || 'prompt'}.prmt`;
 
-    downloadFile(filename, JSON.stringify(payload, null, 2));
+    // В Electron — нативный диалог сохранения, в вебе — download (§6)
+    const saved = await saveTextFile(filename, JSON.stringify(payload, null, 2));
+    if (!saved) return; // пользователь отменил диалог
     pushToast({
       type: 'success',
       message: `Экспортировано: ${data.length} промптов${foldersOut.length ? `, папок: ${foldersOut.length}` : ''}`,

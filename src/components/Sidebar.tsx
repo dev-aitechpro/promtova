@@ -6,6 +6,7 @@ import { usePromtovaStore, useUIStore } from '../store/usePromtovaStore';
 import { cn } from '../utils/cn';
 import { readFileAsText } from '../utils/promtova';
 import { parseImportFile } from '../utils/importExport';
+import { isElectron, openTextFile } from '../utils/fileBridge';
 import { folderNameById, getFolderIcon, getSiblings } from '../utils/folders';
 import { FOCUS_SEARCH_EVENT } from '../hooks/useGlobalHotkeys';
 import type { Folder } from '../shared/types';
@@ -66,26 +67,42 @@ const Sidebar = () => {
     selectPrompt(id);
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  /** Общий разбор импортируемого текста → диалог объединения баз (§5.1). */
+  const importText = (text: string, titleHint: string) => {
+    const parsed = parseImportFile(text, currentFolderName(), titleHint);
+    if (parsed.prompts.length === 0) {
+      pushToast({ type: 'error', message: parsed.errors[0] ?? 'Не удалось разобрать файл' });
+      return;
+    }
+    openMerge(parsed);
+  };
+
+  // Веб-режим: скрытый <input type="file">
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const text = await readFileAsText(file);
-      const fallbackFolder = currentFolderName();
-      const titleHint = file.name.replace(/\.(md|txt)$/i, '');
-      const parsed = parseImportFile(text, fallbackFolder, titleHint);
-      if (parsed.prompts.length === 0) {
-        pushToast({
-          type: 'error',
-          message: parsed.errors[0] ?? 'Не удалось разобрать файл',
-        });
-        return;
-      }
-      openMerge(parsed); // диалог объединения баз (§5.1)
+      importText(text, file.name.replace(/\.(md|txt|prmt|json)$/i, ''));
     } catch {
       pushToast({ type: 'error', message: 'Ошибка чтения файла' });
     }
     e.target.value = '';
+  };
+
+  // Electron: нативный диалог открытия файла (§6)
+  const handleImportClick = async () => {
+    if (!isElectron()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const picked = await openTextFile();
+      if (!picked) return; // пользователь отменил диалог
+      importText(picked.text, picked.name.replace(/\.(md|txt|prmt|json)$/i, ''));
+    } catch {
+      pushToast({ type: 'error', message: 'Ошибка чтения файла' });
+    }
   };
 
   // ============ Дерево папок (§3, §7.1) ============
@@ -233,7 +250,7 @@ const Sidebar = () => {
               Промтовая
             </span>
             <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-              v1.1.0 · MIT
+              v1.2.0 · MIT
             </span>
           </div>
         </div>
@@ -380,10 +397,10 @@ const Sidebar = () => {
         style={{ borderColor: 'var(--border-subtle)' }}
       >
         <IconButton title="Настройки" onClick={openSettings}><Settings size={15} /></IconButton>
-        <IconButton title="Импорт" onClick={() => fileInputRef.current?.click()}><Upload size={15} /></IconButton>
+        <IconButton title="Импорт" onClick={handleImportClick}><Upload size={15} /></IconButton>
         <IconButton title="Экспорт" onClick={openExport}><Download size={15} /></IconButton>
         <IconButton title="Горячие клавиши" onClick={openShortcuts}><Keyboard size={15} /></IconButton>
-        <input ref={fileInputRef} type="file" accept=".prmt,.json,.md,.txt" className="hidden" onChange={handleImport} />
+        <input ref={fileInputRef} type="file" accept=".prmt,.json,.md,.txt" className="hidden" onChange={handleFileInput} />
         <span
           className="ml-1 truncate rounded px-1.5 py-0.5 text-[9px] font-mono"
           style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)' }}

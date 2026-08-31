@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import App from './App';
 import { usePromtovaStore, useUIStore } from './store/usePromtovaStore';
+import { resetMemoryStorage } from './storage/nativeStorage';
 
 const resetStores = () => {
-  localStorage.clear();
+  // Сбрасываем in-memory адаптер нативного хранилища вместо localStorage (§4.1 ТЗ).
+  resetMemoryStorage();
   usePromtovaStore.setState({
     prompts: usePromtovaStore.getState().prompts,
     selectedFolderId: 'all',

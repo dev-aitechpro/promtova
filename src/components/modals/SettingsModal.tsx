@@ -4,12 +4,14 @@ import Button from '../ui/Button';
 import { IconButton } from '../ui/Button';
 import { useUIStore, useThemeStore, usePromtovaStore, applyTheme } from '../../store/usePromtovaStore';
 import { Save, Trash2, Download, Check, AlertTriangle, Sparkles, Sun, Moon, Palette, Type, Layers, HardDrive } from 'lucide-react';
+import { getDataPath, resetAllData } from '../../storage/nativeStorage';
 
 // =============== Modals ===============
 const SettingsModal = () => {
   const { settingsOpen, closeSettings, openShortcuts, openThemeEditor, openExport } = useUIStore();
   const { currentTheme, setTheme, customThemes, removeCustomTheme } = useThemeStore();
   const { autosave, setAutosave, editorFontSize, setEditorFontSize, prompts } = usePromtovaStore();
+  const dataPath = getDataPath(); // путь к файлу данных в Electron, null в веб-режиме
 
   const themes = [
     { id: 'dark', name: 'Тёмный графит', icon: <Moon size={14} />, swatch: ['#0B0D10', '#FF6B35', '#F5F7FA'] },
@@ -162,11 +164,15 @@ const SettingsModal = () => {
             Данные
           </h3>
           <div className="space-y-2">
-            {/* Веб-версия хранит данные в localStorage: файловой кнопки здесь быть не может (§8.3) */}
+            {/* §8: показываем, где физически лежат данные */}
             <SettingRow
               icon={<HardDrive size={13} />}
               title="Расположение данных"
-              desc="localStorage этого браузера (ключи promtova-state / promtova-theme)"
+              desc={
+                dataPath
+                  ? `Файл на этом ПК: ${dataPath}`
+                  : 'В памяти этой сессии (веб-режим: данные не сохраняются на диск)'
+              }
               control={
                 <span className="font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>
                   {prompts.length} промптов
@@ -198,11 +204,11 @@ const SettingsModal = () => {
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={() => {
-                    if (confirm('Удалить ВСЕ промпты и сбросить настройки? Это действие необратимо.')) {
-                      localStorage.clear();
-                      location.reload();
-                    }
+                  onClick={async () => {
+                    if (!confirm('Удалить ВСЕ промпты и сбросить настройки? Это действие необратимо.')) return;
+                    // чистим нативный файл (через IPC) и in-memory, затем перезапускаемся
+                    await resetAllData();
+                    location.reload();
                   }}
                 >
                   Сбросить
@@ -216,7 +222,7 @@ const SettingsModal = () => {
           className="rounded-md border p-3 text-[11px]"
           style={{ background: 'var(--bg-panel)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}
         >
-          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.1.0 · MIT License<br />
+          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.2.0 · MIT License<br />
           © Pavel K. / Neurocode · {new Date().getFullYear()}
         </section>
       </div>

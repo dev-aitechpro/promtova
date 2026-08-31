@@ -10,6 +10,7 @@ import type {
   Tag,
 } from '../shared/types';
 import { seedFolders, seedPrompts } from './seedData';
+import { nativeStorage } from '../storage/nativeStorage';
 import { extractVariables, getPromptText, newId } from '../utils/promtova';
 import { getDescendantIds, getSiblings, normalizeFolders } from '../utils/folders';
 import {
@@ -456,7 +457,8 @@ export const usePromtovaStore = create<PromtovaState>()(
     {
       name: 'promtova-state',
       version: 2,
-      storage: createJSONStorage(() => localStorage),
+      // Нативное хранилище (Electron → файл на диске; веб/тесты → in-memory) (§2.1)
+      storage: createJSONStorage(() => nativeStorage),
       partialize: (s) => ({
         prompts: s.prompts,
         folders: s.folders,
@@ -740,7 +742,8 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'promtova-theme',
-      storage: createJSONStorage(() => localStorage),
+      // Нативное хранилище (Electron → файл на диске; веб/тесты → in-memory) (§2.1)
+      storage: createJSONStorage(() => nativeStorage),
     },
   ),
 );

@@ -3,6 +3,9 @@ node_modules/
 
 # Build output
 dist/
+release/
+# Мусорный кеш graphify, попавший в src (не должен коммититься)
+src/.graphify/
 
 # Logs / OS
 *.log
