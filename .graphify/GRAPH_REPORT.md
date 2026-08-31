@@ -1,24 +1,24 @@
 # Graph Report - .  (2026-08-31)
 
 ## Corpus Check
-- Corpus is ~37 947 words - fits in a single context window. You may not need a graph.
+- Corpus is ~38 036 words - fits in a single context window. You may not need a graph.
 
 ## Summary
-- 251 nodes · 602 edges · 9 communities detected
+- 252 nodes · 604 edges · 9 communities detected
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
-- Edge kinds: imports: 202 · contains: 195 · imports_from: 131 · MODIFIES: 60 · calls: 7 · ON_BRANCH: 4 · PARENT_OF: 3
+- Edge kinds: imports: 202 · contains: 195 · imports_from: 131 · MODIFIES: 60 · calls: 7 · ON_BRANCH: 5 · PARENT_OF: 4
 
 
 ## Input Scope
 - Requested: auto
 - Resolved: committed (source: default-auto)
 - Included files: 58 · Candidates: 77
-- Excluded: 0 untracked · 24564 ignored · 0 sensitive · 3 missing committed
+- Excluded: 1 untracked · 24578 ignored · 0 sensitive · 3 missing committed
 - Recommendation: Use --scope all or graphify.yaml inputs.corpus for a knowledge-base folder.
 
 ## Graph Freshness
-- Built from Git commit: `adf1a49`
+- Built from Git commit: `8873ff5`
 - Compare this hash to `git rev-parse HEAD` before trusting freshness-sensitive graph output.
 ## God Nodes (most connected - your core abstractions)
 1. `useUIStore` - 20 edges
@@ -34,7 +34,7 @@
 
 ## Surprising Connections (you probably didn't know these)
 - `93ca1b9 baseline: исходное состояние проекта перед доработкой по ТЗ v2` --ON_BRANCH--> `master`  [EXTRACTED]
-  git → git  _Bridges community 2 → community 3_
+  git → git  _Bridges community 3 → community 2_
 
 ## Communities
 
@@ -47,12 +47,12 @@ Cohesion: 0.08
 Nodes (13): CustomTheme, copyToClipboard(), promptTextForCopy(), countChars(), countWords(), extractVariables(), formatRelative(), fuzzyMatch() (+5 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.07
-Nodes (7): 93ca1b9 baseline: исходное состояние проекта перед доработкой по ТЗ v2, useStoresHydrated(), applyTheme(), useThemeStore, cn(), __dirname, __filename
+Cohesion: 0.09
+Nodes (15): master, 8873ff5 Граф знаний: включён нативный десктоп-слой (251 узел, 602 ребра), 90a75cb docs: README с описанием v1.1.0, обновлён PROJECT_ANALYSIS, граф знаний пересобран, adf1a49 v1.2.0: нативный десктоп (electron-store, electron-updater, setup.exe) + UI автообновления и иконка, ccd1a0d Доработка по ТЗ v2: иерархия папок, шаблонный режим, импорт с объединением, хоткеи, getDataPath(), isNativePersistence(), memory (+7 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.09
-Nodes (14): master, 90a75cb docs: README с описанием v1.1.0, обновлён PROJECT_ANALYSIS, граф знаний пересобран, adf1a49 v1.2.0: нативный десктоп (electron-store, electron-updater, setup.exe) + UI автообновления и иконка, ccd1a0d Доработка по ТЗ v2: иерархия папок, шаблонный режим, импорт с объединением, хоткеи, getDataPath(), isNativePersistence(), memory, memoryStorage (+6 more)
+Cohesion: 0.07
+Nodes (7): 93ca1b9 baseline: исходное состояние проекта перед доработкой по ТЗ v2, useStoresHydrated(), applyTheme(), useThemeStore, cn(), __dirname, __filename
 
 ### Community 4 - "Community 4"
 Cohesion: 0.10
@@ -81,11 +81,11 @@ Nodes (11): NativeAppApi, NativeFileApi, NativeFileFilter, NativeStoresApi, Open
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useUIStore` connect `Community 4` to `Community 1`, `Community 5`, `Community 7`, `Community 0`, `Community 3`, `Community 2`?**
+- **Why does `useUIStore` connect `Community 4` to `Community 1`, `Community 5`, `Community 7`, `Community 0`, `Community 2`, `Community 3`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `usePromtovaStore` connect `Community 4` to `Community 1`, `Community 2`, `Community 5`, `Community 7`, `Community 0`, `Community 3`?**
+- **Why does `usePromtovaStore` connect `Community 4` to `Community 1`, `Community 3`, `Community 5`, `Community 7`, `Community 0`, `Community 2`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `Prompt` connect `Community 0` to `Community 1`, `Community 5`, `Community 2`?**
+- **Why does `Prompt` connect `Community 0` to `Community 1`, `Community 5`, `Community 3`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **What connects `Props`, `ACTIONS`, `UpdaterState` to the rest of the system?**
   _36 weakly-connected nodes found - possible documentation gaps or missing edges._
@@ -94,4 +94,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.07716701902748414 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.06890756302521009 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09243697478991597 - nodes in this community are weakly interconnected._

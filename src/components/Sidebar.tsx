@@ -12,8 +12,9 @@ import { FOCUS_SEARCH_EVENT } from '../hooks/useGlobalHotkeys';
 import type { Folder } from '../shared/types';
 import {
   Plus, Search, Star, Settings, Download, Upload, FileText, X, Sparkles, Hash,
-  Keyboard, Folder as FolderIcon, ArrowUp, ArrowDown, ChevronRight,
+  Keyboard, Folder as FolderIcon, ArrowUp, ArrowDown, ChevronRight, Send,
 } from 'lucide-react';
+import { openExternal } from '../utils/openExternal';
 
 // =============== Sidebar ===============
 const Sidebar = () => {
@@ -400,6 +401,7 @@ const Sidebar = () => {
         <IconButton title="Импорт" onClick={handleImportClick}><Upload size={15} /></IconButton>
         <IconButton title="Экспорт" onClick={openExport}><Download size={15} /></IconButton>
         <IconButton title="Горячие клавиши" onClick={openShortcuts}><Keyboard size={15} /></IconButton>
+        <IconButton title="Telegram @dev_aitech" onClick={() => openExternal('https://t.me/dev_aitech')}><Send size={15} /></IconButton>
         <input ref={fileInputRef} type="file" accept=".prmt,.json,.md,.txt" className="hidden" onChange={handleFileInput} />
         <span
           className="ml-1 truncate rounded px-1.5 py-0.5 text-[9px] font-mono"

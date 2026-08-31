@@ -53,6 +53,8 @@ export interface NativeAppApi {
   version: string;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
   installUpdate(): Promise<void>;
+  /** Открывает внешний URL в системном браузере (в Electron); в вебе не нужен. */
+  openExternal(url: string): Promise<void>;
 }
 
 export interface PromtovaApi {

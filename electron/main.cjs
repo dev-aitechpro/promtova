@@ -3,7 +3,7 @@
 // Загружает single-file сборку renderer (dist/index.html) и держит весь доступ к диску.
 
 const path = require('path');
-const { app, BrowserWindow, dialog, session, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, session, ipcMain, shell } = require('electron');
 
 const { createStore, registerStoreHandlers } = require('./storeService.cjs');
 const { registerFileHandlers } = require('./fileService.cjs');
@@ -111,6 +111,12 @@ app.whenReady().then(async () => {
     event.returnValue = buildInfo();
   });
   ipcMain.handle('app:getInfo', () => buildInfo());
+
+  // Открытие внешних ссылок в системном браузере, а не внутри окна приложения.
+  ipcMain.handle('app:openExternal', (_event, url) => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
+    return shell.openExternal(url);
+  });
 
   await createWindow();
   if (mainWindow) registerUpdater(mainWindow, { ipcMain, app });

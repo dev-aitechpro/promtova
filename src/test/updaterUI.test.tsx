@@ -27,6 +27,7 @@ const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: Re
       };
     },
     installUpdate,
+    openExternal: vi.fn(async () => undefined),
   };
   (window as unknown as { promtova: PromtovaApi }).promtova = {
     stores: {} as PromtovaApi['stores'],

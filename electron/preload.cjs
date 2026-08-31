@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('promtova', {
     dataPath: info.dataPath || null,
     version: info.version || null,
     getInfo: () => ipcRenderer.invoke('app:getInfo'),
+    openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
 
     onUpdateEvent: (callback) => {
       const listener = (_event, data) => callback(data);

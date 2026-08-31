@@ -5,6 +5,7 @@ import { IconButton } from '../ui/Button';
 import { useUIStore, useThemeStore, usePromtovaStore, applyTheme } from '../../store/usePromtovaStore';
 import { Save, Trash2, Download, Check, AlertTriangle, Sparkles, Sun, Moon, Palette, Type, Layers, HardDrive } from 'lucide-react';
 import { getDataPath, resetAllData } from '../../storage/nativeStorage';
+import { openExternal } from '../../utils/openExternal';
 
 // =============== Modals ===============
 const SettingsModal = () => {
@@ -224,6 +225,24 @@ const SettingsModal = () => {
         >
           <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.2.0 · MIT License<br />
           © Pavel K. / Neurocode · {new Date().getFullYear()}
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              className="cursor-pointer underline hover:opacity-80"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => openExternal('https://t.me/dev_aitech')}
+            >
+              Telegram @dev_aitech
+            </button>
+            <button
+              type="button"
+              className="cursor-pointer underline hover:opacity-80"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => openExternal('https://boosty.to/kpavels1997/donate')}
+            >
+              Поддержать на boosty
+            </button>
+          </div>
         </section>
       </div>
     </Modal>
