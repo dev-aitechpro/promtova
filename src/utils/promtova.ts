@@ -1,4 +1,23 @@
 // Variable substitution & content utilities
+import type { Prompt, PromptId } from '../shared/types';
+
+/** Устойчивый id: crypto.randomUUID с фолбэком для окружений без Web Crypto (§4.3). */
+export const newId = (): PromptId => {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+/**
+ * Единый источник текста промпта (§4.1).
+ * Обычный режим — `content`; шаблонный — склейка system/context/output.
+ */
+export const getPromptText = (p: Prompt): string => {
+  if (p.useTemplate) {
+    return [p.system, p.context, p.output].filter((s) => s && s.trim()).join('\n\n');
+  }
+  return p.content ?? '';
+};
 
 export const substituteVariables = (
   content: string,
@@ -19,6 +38,25 @@ export const extractVariables = (content: string): string[] => {
   }
   return Array.from(set);
 };
+
+/**
+ * Допускаем только безопасные схемы (§8.4). Всё прочее (`javascript:`, `data:` и т.п.)
+ * отклоняется — ссылка остаётся обычным текстом.
+ */
+export const sanitizeUrl = (url: string): string | null => {
+  const u = url.trim();
+  if (!u) return null;
+  // относительные ссылки и якоря всегда разрешены
+  if (/^[#/]/.test(u) || u.startsWith('./') || u.startsWith('../')) return u;
+  // есть явная схема — проверяем по белому списку
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) {
+    return /^(https?:|mailto:)/i.test(u) ? u : null;
+  }
+  return u; // без схемы — считаем относительной
+};
+
+/** Экранирование кавычек: текст уже экранирован по `& < >`, защищаем только атрибут. */
+const escapeAttr = (s: string) => s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 // Lightweight Markdown -> HTML (covers our needs: headings, bold, italic, code, lists, blockquote, hr, links)
 export const renderMarkdown = (md: string): string => {
@@ -57,8 +95,12 @@ export const renderMarkdown = (md: string): string => {
   html = html.replace(/(^|\W)_(.+?)_(\W|$)/g, '$1<em>$2</em>$3');
   html = html.replace(/(^|\W)\*(.+?)\*(\W|$)/g, '$1<em>$2</em>$3');
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Links (href валидируется по схеме и экранируется — §8.4)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+    const safe = sanitizeUrl(url);
+    if (!safe) return match; // небезопасная схема — оставляем исходный текст
+    return `<a href="${escapeAttr(safe)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  });
 
   // Tables (simple)
   html = html.replace(/((?:\|[^\n]+\|\n)+)/g, (block) => {
@@ -126,11 +168,6 @@ export const formatRelative = (iso: string): string => {
   if (diff < 2592000) return `${Math.floor(diff / 86400)} дн назад`;
   if (diff < 31536000) return `${Math.floor(diff / 2592000)} мес назад`;
   return `${Math.floor(diff / 31536000)} г назад`;
-};
-
-export const formatDate = (iso: string): string => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export const countWords = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
