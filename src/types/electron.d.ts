@@ -59,7 +59,7 @@ export interface NativeAppApi {
   isElectron: boolean;
   /** Абсолютный путь к файлу данных (в Electron) или null в веб-режиме. */
   dataPath: string | null;
-  version: string;
+  version: string | null;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
   installUpdate(): Promise<void>;
   /** Открывает внешний URL в системном браузере (в Electron); в вебе не нужен. */

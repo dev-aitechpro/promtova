@@ -6,6 +6,7 @@ import { useUIStore, useThemeStore, usePromtovaStore, applyTheme } from '../../s
 import { Save, Trash2, Download, Check, AlertTriangle, Sparkles, Sun, Moon, Palette, Type, Layers, HardDrive } from 'lucide-react';
 import { getDataPath, resetAllData } from '../../storage/nativeStorage';
 import { openExternal } from '../../utils/openExternal';
+import { getAppVersion } from '../../utils/appVersion';
 
 // =============== Modals ===============
 const SettingsModal = () => {
@@ -223,7 +224,7 @@ const SettingsModal = () => {
           className="rounded-md border p-3 text-[11px]"
           style={{ background: 'var(--bg-panel)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}
         >
-          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v1.2.2 · MIT License<br />
+          <strong style={{ color: 'var(--text-secondary)' }}>Промтовая</strong> · v{getAppVersion()} · MIT License<br />
           © Pavel K. / Neurocode · {new Date().getFullYear()}
           <div className="mt-2 flex items-center gap-3">
             <button

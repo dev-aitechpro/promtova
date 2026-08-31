@@ -1,7 +1,7 @@
 {
   "name": "promtova",
   "private": true,
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Промтовая — IDE для промпт-инжиниринга",
   "type": "module",
   "main": "electron/main.cjs",

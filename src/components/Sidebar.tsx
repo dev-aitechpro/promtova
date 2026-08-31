@@ -16,6 +16,7 @@ import {
   Keyboard, Folder as FolderIcon, ArrowUp, ArrowDown, ChevronRight, Send, CloudDownload,
 } from 'lucide-react';
 import { openExternal } from '../utils/openExternal';
+import { getAppVersion } from '../utils/appVersion';
 
 // =============== Sidebar ===============
 const Sidebar = () => {
@@ -268,7 +269,7 @@ const Sidebar = () => {
               Промтовая
             </span>
             <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-              v1.2.2 · MIT
+              v{getAppVersion()} · MIT
             </span>
           </div>
         </div>
