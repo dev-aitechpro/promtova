@@ -1,37 +1,91 @@
-// Импорт/экспорт базы промптов: валидация, миграция и разрешение конфликтов.
+// Import/export of the prompt database with schema migration and conflict handling.
 import type {
+  EvaluationCriterion,
   ExportData,
   Folder,
   MergeAction,
   ModelProfile,
   Prompt,
+  PromptAssetType,
   PromptBlock,
+  PromptDependency,
   PromptRun,
+  PromptSection,
   PromptTemplate,
+  PromptVariable,
+  PromptVariableType,
   PromptVersion,
 } from '../shared/types';
 import { normalizeFolders } from './folders';
 import { newId } from './promtova';
+import { asPromptAssetType, asPromptVariableType } from './promptEngineering';
 
 export const EXPORT_VERSION = '2.0';
 
-const isObj = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
+const isObj = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
+const str = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
 
-const optionalArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value as T[] : []);
+const parseSection = (raw: unknown): PromptSection | null => {
+  if (!isObj(raw)) return null;
+  return {
+    id: str(raw.id) || newId(),
+    key: str(raw.key) || str(raw.label) || 'section',
+    label: str(raw.label) || str(raw.key) || 'Section',
+    content: str(raw.content),
+    order: typeof raw.order === 'number' ? raw.order : 0,
+    enabled: raw.enabled !== false,
+  };
+};
 
-const normalizeOptionalEntities = <T extends { id?: unknown }>(
-  value: unknown,
-  validator: (raw: unknown) => T | null,
-): T[] => optionalArray<unknown>(value).map(validator).filter((x): x is T => x !== null);
+const parseVariable = (name: string, raw: unknown): PromptVariable | null => {
+  if (!isObj(raw)) return null;
+  return {
+    name: str(raw.name) || name,
+    type: asPromptVariableType(raw.type),
+    description: str(raw.description) || undefined,
+    defaultValue: raw.defaultValue as PromptVariable['defaultValue'],
+    required: raw.required === true,
+    options: Array.isArray(raw.options)
+      ? raw.options.filter((value): value is string => typeof value === 'string')
+      : undefined,
+    pattern: str(raw.pattern) || undefined,
+  };
+};
 
-/**
- * Приводит произвольную запись к `Prompt`.
- * Старое поле `folder` сохраняется, а `folderId` принимается как каноническая ссылка на Folder.
- */
-export const normalizePrompt = (raw: unknown, fallbackFolder = 'Development', fallbackFolderId?: string): Prompt | null => {
+const parseDependency = (raw: unknown): PromptDependency | null => {
+  if (!isObj(raw)) return null;
+  const type = asPromptAssetType(raw.type);
+  const id = str(raw.id);
+  if (!type || !id) return null;
+  const relation = str(raw.relation);
+  return {
+    type,
+    id,
+    relation: ['uses', 'requires', 'references', 'derived-from'].includes(relation)
+      ? relation as PromptDependency['relation']
+      : undefined,
+  };
+};
+
+const parseCriteria = (raw: unknown): EvaluationCriterion[] =>
+  Array.isArray(raw)
+    ? raw.filter(isObj).map((criterion) => ({
+        id: str(criterion.id) || newId(),
+        name: str(criterion.name) || 'Criterion',
+        score: typeof criterion.score === 'number' ? criterion.score : undefined,
+        weight: typeof criterion.weight === 'number' ? criterion.weight : undefined,
+        rationale: str(criterion.rationale) || undefined,
+      }))
+    : [];
+
+export const normalizePrompt = (
+  raw: unknown,
+  fallbackFolder = 'Development',
+  fallbackFolderId?: string,
+): Prompt | null => {
   if (!isObj(raw)) return null;
   const title = str(raw.title).trim();
   const content = str(raw.content);
@@ -40,55 +94,60 @@ export const normalizePrompt = (raw: unknown, fallbackFolder = 'Development', fa
   const output = str(raw.output);
   if (!title && !content && !system && !context && !output) return null;
 
-  const now = new Date().toISOString();
   const vars: Record<string, string> = {};
   if (isObj(raw.vars)) {
-    for (const [k, v] of Object.entries(raw.vars)) {
-      if (typeof v === 'string') vars[k] = v;
-    }
+    Object.entries(raw.vars).forEach(([key, value]) => {
+      if (typeof value === 'string') vars[key] = value;
+    });
   }
 
+  const rawSchema = isObj(raw.variableSchema) ? raw.variableSchema : null;
+  const variableSchema = rawSchema
+    ? Object.fromEntries(
+        Object.entries(rawSchema)
+          .map(([name, value]) => [name, parseVariable(name, value)])
+          .filter((entry): entry is [string, PromptVariable] => entry[1] !== null),
+      )
+    : undefined;
+
+  const sections = Array.isArray(raw.sections)
+    ? raw.sections.map(parseSection).filter((value): value is PromptSection => value !== null)
+    : undefined;
+  const blockRefs = Array.isArray(raw.blockRefs)
+    ? raw.blockRefs
+        .filter(isObj)
+        .map((ref) => ({
+          blockId: str(ref.blockId),
+          order: typeof ref.order === 'number' ? ref.order : 0,
+          overrides: isObj(ref.overrides)
+            ? Object.fromEntries(
+                Object.entries(ref.overrides).filter(([, value]) => typeof value === 'string'),
+              ) as Record<string, string>
+            : undefined,
+        }))
+        .filter((ref) => Boolean(ref.blockId))
+    : undefined;
+  const dependencies = Array.isArray(raw.dependencies)
+    ? raw.dependencies.map(parseDependency).filter((value): value is PromptDependency => value !== null)
+    : undefined;
+
+  const now = new Date().toISOString();
   return {
     id: typeof raw.id === 'number' ? String(raw.id) : str(raw.id) || newId(),
     title: title || 'Без названия',
-    tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.filter((value): value is string => typeof value === 'string')
+      : [],
     preview: str(raw.preview),
     path: str(raw.path),
     content,
     folderId: str(raw.folderId) || fallbackFolderId,
     folder: str(raw.folder) || fallbackFolder,
-    sections: Array.isArray(raw.sections) ? raw.sections.filter(isObj).map((section) => ({
-      id: str(section.id) || newId(),
-      key: str(section.key) || str(section.label) || 'section',
-      label: str(section.label) || str(section.key) || 'Section',
-      content: str(section.content),
-      order: typeof section.order === 'number' ? section.order : 0,
-      enabled: section.enabled !== false,
-    })) : undefined,
+    sections,
     templateId: str(raw.templateId) || undefined,
-    blockRefs: Array.isArray(raw.blockRefs) ? raw.blockRefs.filter(isObj).map((ref) => ({
-      blockId: str(ref.blockId),
-      order: typeof ref.order === 'number' ? ref.order : 0,
-      overrides: isObj(ref.overrides) ? Object.fromEntries(Object.entries(ref.overrides).filter(([, v]) => typeof v === 'string')) as Record<string, string> : undefined,
-    })).filter((ref) => Boolean(ref.blockId)) : undefined,
-    dependencies: Array.isArray(raw.dependencies) ? raw.dependencies.filter(isObj).map((dep) => ({
-      type: str(dep.type) as Prompt['dependencies'] extends Array<infer U> ? U extends { type: infer T } ? T : never : never,
-      id: str(dep.id),
-      relation: str(dep.relation) as 'uses' | 'requires' | 'references' | 'derived-from' | undefined,
-    })).filter((dep) => Boolean(dep.id)) : undefined,
-    variableSchema: isObj(raw.variableSchema)
-      ? Object.fromEntries(
-          Object.entries(raw.variableSchema).filter(([, value]) => isObj(value)).map(([name, value]) => [name, {
-            name: str(value.name) || name,
-            type: str(value.type) as 'string' | 'number' | 'boolean' | 'text' | 'select' | 'multiselect' | 'json',
-            description: str(value.description) || undefined,
-            defaultValue: value.defaultValue as string | number | boolean | string[] | undefined,
-            required: value.required === true,
-            options: Array.isArray(value.options) ? value.options.filter((v): v is string => typeof v === 'string') : undefined,
-            pattern: str(value.pattern) || undefined,
-          }]),
-        )
-      : undefined,
+    blockRefs,
+    dependencies,
+    variableSchema,
     system,
     context,
     output,
@@ -109,10 +168,115 @@ export const normalizeFolder = (raw: unknown): Folder | null => {
     id: str(raw.id) || newId(),
     name,
     parent: typeof raw.parent === 'string' ? raw.parent : null,
-    children: Array.isArray(raw.children) ? raw.children.filter((c): c is string => typeof c === 'string') : [],
+    children: Array.isArray(raw.children)
+      ? raw.children.filter((value): value is string => typeof value === 'string')
+      : [],
     icon: typeof raw.icon === 'string' ? raw.icon : 'Folder',
     color: typeof raw.color === 'string' ? raw.color : '#FF6B35',
     order: typeof raw.order === 'number' ? raw.order : 0,
+  };
+};
+
+const normalizeVersion = (raw: unknown): PromptVersion | null => {
+  if (!isObj(raw) || !str(raw.promptId)) return null;
+  const sections = Array.isArray(raw.sections)
+    ? raw.sections.map(parseSection).filter((value): value is PromptSection => value !== null)
+    : [];
+  const variables = isObj(raw.variables)
+    ? Object.entries(raw.variables).map(([name, value]) => parseVariable(name, value)).filter((value): value is PromptVariable => value !== null)
+    : Array.isArray(raw.variables)
+      ? raw.variables.filter(isObj).map((value) => parseVariable(str(value.name), value)).filter((value): value is PromptVariable => value !== null)
+      : [];
+  return {
+    id: str(raw.id) || newId(),
+    promptId: str(raw.promptId),
+    version: typeof raw.version === 'number' && raw.version > 0 ? Math.floor(raw.version) : 1,
+    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    note: str(raw.note),
+    content: str(raw.content),
+    sections,
+    variables,
+    legacy: isObj(raw.legacy)
+      ? {
+          system: str(raw.legacy.system) || undefined,
+          context: str(raw.legacy.context) || undefined,
+          output: str(raw.legacy.output) || undefined,
+          useTemplate: raw.legacy.useTemplate === true,
+        }
+      : {},
+  };
+};
+
+const normalizeTemplate = (raw: unknown): PromptTemplate | null => {
+  if (!isObj(raw) || !str(raw.name)) return null;
+  return {
+    id: str(raw.id) || newId(),
+    name: str(raw.name),
+    description: str(raw.description),
+    sections: Array.isArray(raw.sections)
+      ? raw.sections.map(parseSection).filter((value): value is PromptSection => value !== null)
+      : [],
+    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    updatedAt: str(raw.updatedAt) || new Date().toISOString(),
+  };
+};
+
+const normalizeBlock = (raw: unknown): PromptBlock | null => {
+  if (!isObj(raw) || !str(raw.name)) return null;
+  return {
+    id: str(raw.id) || newId(),
+    name: str(raw.name),
+    description: str(raw.description),
+    content: str(raw.content),
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.filter((value): value is string => typeof value === 'string')
+      : [],
+    variables: [],
+    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    updatedAt: str(raw.updatedAt) || new Date().toISOString(),
+  };
+};
+
+const normalizeModelProfile = (raw: unknown): ModelProfile | null => {
+  if (!isObj(raw) || !str(raw.model)) return null;
+  return {
+    id: str(raw.id) || newId(),
+    name: str(raw.name) || str(raw.model),
+    provider: str(raw.provider) as ModelProfile['provider'],
+    model: str(raw.model),
+    baseUrl: str(raw.baseUrl) || undefined,
+    apiKeyRef: str(raw.apiKeyRef) || undefined,
+    capabilities: Array.isArray(raw.capabilities)
+      ? raw.capabilities.filter((value): value is string => typeof value === 'string')
+      : undefined,
+    params: isObj(raw.params) ? raw.params : undefined,
+    notes: str(raw.notes) || undefined,
+    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    updatedAt: str(raw.updatedAt) || new Date().toISOString(),
+  };
+};
+
+const normalizeRun = (raw: unknown): PromptRun | null => {
+  if (!isObj(raw) || !str(raw.promptId)) return null;
+  const tokenUsage = isObj(raw.tokenUsage)
+    ? {
+        input: typeof raw.tokenUsage.input === 'number' ? raw.tokenUsage.input : undefined,
+        output: typeof raw.tokenUsage.output === 'number' ? raw.tokenUsage.output : undefined,
+        total: typeof raw.tokenUsage.total === 'number' ? raw.tokenUsage.total : undefined,
+      }
+    : undefined;
+  return {
+    id: str(raw.id) || newId(),
+    promptId: str(raw.promptId),
+    versionId: str(raw.versionId) || undefined,
+    modelProfileId: str(raw.modelProfileId) || undefined,
+    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    input: isObj(raw.input) ? raw.input : {},
+    output: str(raw.output),
+    score: typeof raw.score === 'number' ? raw.score : undefined,
+    criteria: parseCriteria(raw.criteria),
+    latencyMs: typeof raw.latencyMs === 'number' ? raw.latencyMs : undefined,
+    tokenUsage,
   };
 };
 
@@ -127,45 +291,58 @@ export interface ParsedImport {
   errors: string[];
 }
 
-export const parseImportFile = (text: string, fallbackFolder = 'Development', titleHint = ''): ParsedImport => {
+export const parseImportFile = (
+  text: string,
+  fallbackFolder = 'Development',
+  titleHint = '',
+): ParsedImport => {
   const trimmed = text.trim();
-  const errors: string[] = [];
-  if (!trimmed) return { prompts: [], folders: [], versions: [], templates: [], blocks: [], modelProfiles: [], runs: [], errors: ['Файл пуст'] };
+  const empty = { prompts: [], folders: [], versions: [], templates: [], blocks: [], modelProfiles: [], runs: [], errors: [] as string[] };
+  if (!trimmed) return { ...empty, errors: ['Файл пуст'] };
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     let data: unknown;
     try {
       data = JSON.parse(trimmed);
     } catch {
-      return { prompts: [], folders: [], versions: [], templates: [], blocks: [], modelProfiles: [], runs: [], errors: ['Файл не является корректным JSON'] };
+      return { ...empty, errors: ['Файл не является корректным JSON'] };
     }
-
     const root = isObj(data) ? data : { prompts: data };
     const rawPrompts = Array.isArray(root.prompts) ? root.prompts : null;
-    if (!rawPrompts) {
-      return { prompts: [], folders: [], versions: [], templates: [], blocks: [], modelProfiles: [], runs: [], errors: ['В файле нет массива "prompts"'] };
-    }
+    if (!rawPrompts) return { ...empty, errors: ['В файле нет массива "prompts"'] };
 
-    const rawFolders = Array.isArray(root.folders) ? root.folders : [];
-    const folders = normalizeFolders(rawFolders.map(normalizeFolder).filter((x): x is Folder => x !== null));
-    const folderIdsByName = new Map(folders.map((f) => [f.name, f.id]));
-
+    const folders = normalizeFolders(
+      (Array.isArray(root.folders) ? root.folders : [])
+        .map(normalizeFolder)
+        .filter((value): value is Folder => value !== null),
+    );
+    const folderIdsByName = new Map(folders.map((folder) => [folder.name, folder.id]));
     const prompts: Prompt[] = [];
-    rawPrompts.forEach((p, i) => {
-      const rawFolder = isObj(p) ? str(p.folder) : '';
-      const norm = normalizePrompt(p, fallbackFolder, rawFolder ? folderIdsByName.get(rawFolder) : undefined);
-      if (norm) prompts.push(norm);
-      else errors.push(`Промпт #${i + 1} пропущен (нет заголовка и содержимого)`);
+    const errors: string[] = [];
+    rawPrompts.forEach((value, index) => {
+      const rawFolder = isObj(value) ? str(value.folder) : '';
+      const prompt = normalizePrompt(
+        value,
+        fallbackFolder,
+        isObj(value) && str(value.folderId) ? str(value.folderId) : rawFolder ? folderIdsByName.get(rawFolder) : undefined,
+      );
+      if (prompt) prompts.push(prompt);
+      else errors.push(`Промпт #${index + 1} пропущен (нет заголовка и содержимого)`);
     });
+
+    const mapEntities = <T>(value: unknown, normalizer: (raw: unknown) => T | null): T[] =>
+      Array.isArray(value)
+        ? value.map(normalizer).filter((item): item is T => item !== null)
+        : [];
 
     return {
       prompts,
       folders,
-      versions: normalizeOptionalEntities<PromptVersion>(root.versions, (raw) => normalizeVersion(raw)),
-      templates: normalizeOptionalEntities<PromptTemplate>(root.templates, (raw) => normalizeTemplate(raw)),
-      blocks: normalizeOptionalEntities<PromptBlock>(root.blocks, (raw) => normalizeBlock(raw)),
-      modelProfiles: normalizeOptionalEntities<ModelProfile>(root.modelProfiles, (raw) => normalizeModelProfile(raw)),
-      runs: normalizeOptionalEntities<PromptRun>(root.runs, (raw) => normalizeRun(raw)),
+      versions: mapEntities(root.versions, normalizeVersion),
+      templates: mapEntities(root.templates, normalizeTemplate),
+      blocks: mapEntities(root.blocks, normalizeBlock),
+      modelProfiles: mapEntities(root.modelProfiles, normalizeModelProfile),
+      runs: mapEntities(root.runs, normalizeRun),
       errors,
     };
   }
@@ -173,42 +350,7 @@ export const parseImportFile = (text: string, fallbackFolder = 'Development', ti
   const firstLine = trimmed.split('\n', 1)[0].replace(/^#\s*/, '').trim();
   const title = titleHint || firstLine.slice(0, 80) || 'Импортированный промпт';
   const prompt = normalizePrompt({ title, content: trimmed }, fallbackFolder)!;
-  return { prompts: [prompt], folders: [], versions: [], templates: [], blocks: [], modelProfiles: [], runs: [], errors };
-};
-
-const normalizeVersion = (raw: unknown): PromptVersion | null => {
-  if (!isObj(raw) || !str(raw.promptId)) return null;
-  return {
-    id: str(raw.id) || newId(),
-    promptId: str(raw.promptId),
-    version: typeof raw.version === 'number' && raw.version > 0 ? Math.floor(raw.version) : 1,
-    createdAt: str(raw.createdAt) || new Date().toISOString(),
-    note: str(raw.note),
-    content: str(raw.content),
-    sections: Array.isArray(raw.sections) ? raw.sections.filter(isObj).map((s) => ({ id: str(s.id) || newId(), key: str(s.key) || 'section', label: str(s.label) || 'Section', content: str(s.content), order: typeof s.order === 'number' ? s.order : 0, enabled: s.enabled !== false })) : [],
-    variables: Array.isArray(raw.variables) ? raw.variables.filter(isObj).map((v) => ({ name: str(v.name), type: str(v.type) as Prompt['variableSchema'] extends Record<string, infer U> ? U extends { type: infer T } ? T : never : never, description: str(v.description) || undefined, defaultValue: v.defaultValue as string | number | boolean | string[] | undefined, required: v.required === true, options: Array.isArray(v.options) ? v.options.filter((x): x is string => typeof x === 'string') : undefined, pattern: str(v.pattern) || undefined })).filter((v) => Boolean(v.name)) : [],
-    legacy: isObj(raw.legacy) ? { system: str(raw.legacy.system) || undefined, context: str(raw.legacy.context) || undefined, output: str(raw.legacy.output) || undefined, useTemplate: raw.legacy.useTemplate === true } : {},
-  };
-};
-
-const normalizeTemplate = (raw: unknown): PromptTemplate | null => {
-  if (!isObj(raw) || !str(raw.name)) return null;
-  return { id: str(raw.id) || newId(), name: str(raw.name), description: str(raw.description), sections: Array.isArray(raw.sections) ? raw.sections.filter(isObj).map((s) => ({ id: str(s.id) || newId(), key: str(s.key) || 'section', label: str(s.label) || 'Section', content: str(s.content), order: typeof s.order === 'number' ? s.order : 0, enabled: s.enabled !== false })) : [], createdAt: str(raw.createdAt) || new Date().toISOString(), updatedAt: str(raw.updatedAt) || new Date().toISOString() };
-};
-
-const normalizeBlock = (raw: unknown): PromptBlock | null => {
-  if (!isObj(raw) || !str(raw.name)) return null;
-  return { id: str(raw.id) || newId(), name: str(raw.name), description: str(raw.description), content: str(raw.content), tags: Array.isArray(raw.tags) ? raw.tags.filter((x): x is string => typeof x === 'string') : [], variables: [], createdAt: str(raw.createdAt) || new Date().toISOString(), updatedAt: str(raw.updatedAt) || new Date().toISOString() };
-};
-
-const normalizeModelProfile = (raw: unknown): ModelProfile | null => {
-  if (!isObj(raw) || !str(raw.model)) return null;
-  return { id: str(raw.id) || newId(), name: str(raw.name) || str(raw.model), provider: str(raw.provider) as ModelProfile['provider'], model: str(raw.model), baseUrl: str(raw.baseUrl) || undefined, apiKeyRef: str(raw.apiKeyRef) || undefined, capabilities: Array.isArray(raw.capabilities) ? raw.capabilities.filter((x): x is string => typeof x === 'string') : undefined, params: isObj(raw.params) ? raw.params : undefined, notes: str(raw.notes) || undefined, createdAt: str(raw.createdAt) || new Date().toISOString(), updatedAt: str(raw.updatedAt) || new Date().toISOString() };
-};
-
-const normalizeRun = (raw: unknown): PromptRun | null => {
-  if (!isObj(raw) || !str(raw.promptId)) return null;
-  return { id: str(raw.id) || newId(), promptId: str(raw.promptId), versionId: str(raw.versionId) || undefined, modelProfileId: str(raw.modelProfileId) || undefined, createdAt: str(raw.createdAt) || new Date().toISOString(), input: isObj(raw.input) ? raw.input : {}, output: str(raw.output), score: typeof raw.score === 'number' ? raw.score : undefined, criteria: Array.isArray(raw.criteria) ? raw.criteria.filter(isObj).map((c) => ({ id: str(c.id) || newId(), name: str(c.name) || 'Criterion', score: typeof c.score === 'number' ? c.score : undefined, weight: typeof c.weight === 'number' ? c.weight : undefined, rationale: str(c.rationale) || undefined })) : [], latencyMs: typeof raw.latencyMs === 'number' ? raw.latencyMs : undefined, tokenUsage: isObj(raw.tokenUsage) ? { input: typeof raw.tokenUsage.input === 'number' ? raw.tokenUsage.input : undefined, output: typeof raw.tokenUsage.output === 'number' ? raw.tokenUsage.output : undefined, total: typeof raw.tokenUsage.total === 'number' ? raw.tokenUsage.total : undefined } : undefined };
+  return { ...empty, prompts: [prompt] };
 };
 
 export interface MergeConflict {
@@ -218,22 +360,19 @@ export interface MergeConflict {
   action: MergeAction;
 }
 
-export const conflictKey = (p: Pick<Prompt, 'title' | 'folder'>): string =>
-  `${p.folder}\u0000${p.title.trim().toLowerCase()}`;
+export const conflictKey = (prompt: Pick<Prompt, 'title' | 'folder'>): string =>
+  `${prompt.folder}\u0000${prompt.title.trim().toLowerCase()}`;
 
 export const detectConflicts = (incoming: Prompt[], existing: Prompt[]): MergeConflict[] => {
-  const byKey = new Map(existing.map((p) => [conflictKey(p), p]));
-  const out: MergeConflict[] = [];
+  const byKey = new Map(existing.map((prompt) => [conflictKey(prompt), prompt]));
   const seen = new Set<string>();
-  incoming.forEach((inc) => {
-    const key = conflictKey(inc);
+  return incoming.flatMap((prompt) => {
+    const key = conflictKey(prompt);
     const found = byKey.get(key);
-    if (found && !seen.has(key)) {
-      seen.add(key);
-      out.push({ key, incoming: inc, existing: found, action: 'skip' });
-    }
+    if (!found || seen.has(key)) return [];
+    seen.add(key);
+    return [{ key, incoming: prompt, existing: found, action: 'skip' as MergeAction }];
   });
-  return out;
 };
 
 const uniqueTitle = (base: string, taken: Set<string>): string => {
@@ -250,41 +389,53 @@ export interface MergeResult {
   replaced: number;
 }
 
-export const applyMerge = (existing: Prompt[], incoming: Prompt[], conflicts: MergeConflict[]): MergeResult => {
-  const actionByKey = new Map(conflicts.map((c) => [c.key, c.action]));
-  const result: Prompt[] = [...existing];
-  const indexById = new Map(result.map((p, i) => [p.id, i]));
+export const applyMerge = (
+  existing: Prompt[],
+  incoming: Prompt[],
+  conflicts: MergeConflict[],
+): MergeResult => {
+  const actionByKey = new Map(conflicts.map((conflict) => [conflict.key, conflict.action]));
+  const result = [...existing];
+  const indexById = new Map(result.map((prompt, index) => [prompt.id, index]));
   let imported = 0;
   let skipped = 0;
   let replaced = 0;
 
-  incoming.forEach((inc) => {
-    const key = conflictKey(inc);
+  incoming.forEach((incomingPrompt) => {
+    const key = conflictKey(incomingPrompt);
     const action = actionByKey.get(key);
     if (action === 'skip') {
       skipped++;
       return;
     }
     if (action === 'overwrite') {
-      const target = result.find((p) => conflictKey(p) === key);
+      const target = result.find((prompt) => conflictKey(prompt) === key);
       if (target) {
-        const idx = indexById.get(target.id)!;
-        result[idx] = { ...inc, id: target.id, folderId: target.folderId ?? target.id, usageCount: target.usageCount, createdAt: target.createdAt };
+        result[indexById.get(target.id)!] = {
+          ...incomingPrompt,
+          id: target.id,
+          usageCount: target.usageCount,
+          createdAt: target.createdAt,
+        };
         replaced++;
       }
       return;
     }
-    const title = action === 'rename' ? uniqueTitle(inc.title, new Set(result.map((p) => p.title))) : inc.title;
-    result.unshift({ ...inc, id: newId(), title });
+
+    const title = action === 'rename'
+      ? uniqueTitle(incomingPrompt.title, new Set(result.map((prompt) => prompt.title)))
+      : incomingPrompt.title;
+    result.unshift({ ...incomingPrompt, id: newId(), title });
     imported++;
   });
+
   return { prompts: result, imported, skipped, replaced };
 };
 
 export const buildExportData = (
   prompts: Prompt[],
   folders: Folder[],
-  extras: Partial<Pick<ExportData, 'versions' | 'templates' | 'blocks' | 'modelProfiles' | 'runs'>> = {},
+  extras: Pick<ExportData, 'versions' | 'templates' | 'blocks' | 'modelProfiles' | 'runs'> = {},
 ): ExportData => ({
   version: EXPORT_VERSION,
   exportedAt: new Date().toISOString(),
