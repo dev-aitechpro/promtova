@@ -24,7 +24,6 @@ setPromptAssetResolver((prompt) => {
 // stay synchronized after any prompt mutation.
 const originalUpdatePrompt = promptStore.getState().updatePrompt;
 const originalDeleteFolder = promptStore.getState().deleteFolder;
-const originalCountFolderPrompts = promptStore.getState().countFolderPrompts;
 
 const resolveLegacyFolderId = (prompt: Prompt, folders: ReturnType<typeof promptStore.getState>['folders']): string | undefined => {
   if (prompt.folderId && folders.some((folder) => folder.id === prompt.folderId)) return prompt.folderId;
