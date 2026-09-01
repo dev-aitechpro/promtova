@@ -6,14 +6,12 @@ import type {
   MergeAction,
   ModelProfile,
   Prompt,
-  PromptAssetType,
   PromptBlock,
   PromptDependency,
   PromptRun,
   PromptSection,
   PromptTemplate,
   PromptVariable,
-  PromptVariableType,
   PromptVersion,
 } from '../shared/types';
 import { normalizeFolders } from './folders';
