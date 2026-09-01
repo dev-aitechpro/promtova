@@ -38,7 +38,8 @@ const updatePromptCompat = (id: PromptId, patch: Partial<Prompt>, versionNote?: 
   const folderId = patch.folderId ?? resolveLegacyFolderId(current, state.folders);
   const folder = folderId ? state.folders.find((item) => item.id === folderId) : undefined;
   const next = { ...current, ...patch, title: nextTitle, folderId, folder: folder?.name ?? patch.folder ?? current.folder };
-  next.path = folder ? `${folder.name}/${nextTitle}` : patch.path ?? current.path;
+  const legacyFolderName = next.folder ?? current.folder ?? current.path.split('/')[0];
+  next.path = folder ? `${folder.name}/${nextTitle}` : legacyFolderName ? `${legacyFolderName}/${nextTitle}` : patch.path ?? current.path;
   next.preview = resolvePromptText(next, state.templates, state.blocks).slice(0, 180);
   originalUpdatePrompt(id, { ...patch, title: nextTitle, folderId, folder: next.folder, path: next.path, preview: next.preview }, versionNote);
 };
