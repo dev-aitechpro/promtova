@@ -61,6 +61,7 @@ export interface NativeAppApi {
   dataPath: string | null;
   version: string | null;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
+  downloadUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
   /** Открывает внешний URL в системном браузере (в Electron); в вебе не нужен. */
   openExternal(url: string): Promise<void>;

@@ -5,13 +5,14 @@ import useAppUpdater from '../hooks/useAppUpdater';
 import Button from './ui/Button';
 
 const UpdateBanner = () => {
-  const { state, install, dismiss } = useAppUpdater();
+  const { state, install, download, dismiss } = useAppUpdater();
 
   if (state.status === 'idle' || state.status === 'checking' || state.status === 'error') {
     return null;
   }
 
-  const downloading = state.status === 'downloading' || state.status === 'available';
+  const isDownloading = state.status === 'downloading';
+  const isAvailable = state.status === 'available';
 
   return (
     <div
@@ -34,8 +35,10 @@ const UpdateBanner = () => {
           >
             {state.status === 'downloaded' ? (
               <Check size={16} />
-            ) : downloading ? (
+            ) : isDownloading ? (
               <Download size={16} />
+            ) : isAvailable ? (
+              <RefreshCw size={16} />
             ) : (
               <RefreshCw size={16} />
             )}
@@ -48,6 +51,15 @@ const UpdateBanner = () => {
                 </p>
                 <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
                   Перезапустите приложение, чтобы применить новую версию.
+                </p>
+              </>
+            ) : isAvailable ? (
+              <>
+                <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Доступно обновление{state.version ? ` · v${state.version}` : ''}
+                </p>
+                <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
+                  Загрузить и установить новую версию?
                 </p>
               </>
             ) : (
@@ -80,6 +92,19 @@ const UpdateBanner = () => {
           </button>
         </div>
 
+        {state.status === 'available' && (
+          <div
+            className="flex items-center justify-end gap-2 border-t px-4 py-2.5"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            <Button variant="ghost" size="sm" onClick={dismiss}>
+              Позже
+            </Button>
+            <Button variant="primary" size="sm" onClick={download}>
+              Загрузить
+            </Button>
+          </div>
+        )}
         {state.status === 'downloaded' && (
           <div
             className="flex items-center justify-end gap-2 border-t px-4 py-2.5"

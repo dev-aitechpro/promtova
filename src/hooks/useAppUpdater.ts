@@ -16,6 +16,7 @@ export interface UpdaterState {
 
 type UpdaterApi = {
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
+  downloadUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
 };
 
@@ -25,7 +26,7 @@ const getApi = (): UpdaterApi | null => {
 };
 
 /** Переносит состояние событий, игнорируя отсутствующий нативный мост. */
-const useAppUpdater = (): { state: UpdaterState; install: () => void; dismiss: () => void } => {
+const useAppUpdater = (): { state: UpdaterState; install: () => void; download: () => void; dismiss: () => void } => {
   const [state, setState] = useState<UpdaterState>({ status: 'idle' });
   // Синхронный флаг «загрузка идёт»: нужен, чтобы последовательность событий
   // update-available → download-progress срабатывала без гонки с React-рендером.
@@ -42,7 +43,8 @@ const useAppUpdater = (): { state: UpdaterState; install: () => void; dismiss: (
           setState({ status: 'checking' });
           break;
         case 'update-available':
-          downloadingRef.current = true;
+          // не качаем автоматически — ждём согласия пользователя
+          downloadingRef.current = false;
           setState({ status: 'available', version: e.payload?.version });
           break;
         case 'download-progress':
@@ -67,6 +69,14 @@ const useAppUpdater = (): { state: UpdaterState; install: () => void; dismiss: (
     return unsubscribe;
   }, []);
 
+  const download = () => {
+    const api = getApi();
+    if (!api) return;
+    downloadingRef.current = true;
+    setState((s) => ({ status: 'downloading', version: s.version, percent: 0 }));
+    void api.downloadUpdate();
+  };
+
   const install = () => {
     const api = getApi();
     if (api && downloadedRef.current) {
@@ -80,7 +90,7 @@ const useAppUpdater = (): { state: UpdaterState; install: () => void; dismiss: (
     setState({ status: 'idle' });
   };
 
-  return { state, install, dismiss };
+  return { state, install, download, dismiss };
 };
 
 export default useAppUpdater;

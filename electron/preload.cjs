@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('promtova', {
       return () => ipcRenderer.removeListener('updater:event', listener);
     },
 
+    downloadUpdate: () => ipcRenderer.invoke('updater:download'),
     installUpdate: () => ipcRenderer.invoke('updater:install'),
   },
 });

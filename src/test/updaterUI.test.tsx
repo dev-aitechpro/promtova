@@ -12,10 +12,11 @@ const clearBridge = () => {
   delete (window as unknown as { promtova?: PromtovaApi }).promtova;
 };
 
-const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: ReturnType<typeof vi.fn> } => {
+const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: ReturnType<typeof vi.fn>; downloadUpdate: ReturnType<typeof vi.fn> } => {
   let subscribers: Array<(e: UpdateEvent) => void> = [];
   const emit = (e: UpdateEvent) => subscribers.forEach((cb) => cb(e));
   const installUpdate = vi.fn(async () => undefined);
+  const downloadUpdate = vi.fn(async () => undefined);
   const api: AppApi = {
     isElectron: true,
     dataPath: 'C:\\Users\\x\\AppData\\Roaming\\Promtova\\stores.json',
@@ -26,6 +27,7 @@ const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: Re
         subscribers = subscribers.filter((s) => s !== cb);
       };
     },
+    downloadUpdate,
     installUpdate,
     openExternal: vi.fn(async () => undefined),
   };
@@ -35,7 +37,7 @@ const installAppBridge = (): { emit: (e: UpdateEvent) => void; installUpdate: Re
     catalog: {} as PromtovaApi['catalog'],
     app: api,
   };
-  return { emit, installUpdate };
+  return { emit, installUpdate, downloadUpdate };
 };
 
 // ============= Hook Harness =============
@@ -65,10 +67,14 @@ describe('useAppUpdater — состояния (§1.2, §1.4)', () => {
     );
   });
 
-  it('прогресс загрузки обновляет percent', async () => {
+  it('прогресс загрузки обновляет percent после согласия на загрузку', async () => {
     const { emit } = installAppBridge();
-    render(<HookHarness render={(h) => <div data-testid="s">{h.state.status}:{h.state.percent ?? ''}</div>} />);
+    let hookRef: ReturnType<typeof useAppUpdater> | null = null;
+    render(<HookHarness render={(h) => { hookRef = h; return <div data-testid="s">{h.state.status}:{h.state.percent ?? ''}</div>; }} />);
     emit({ event: 'update-available', payload: { version: '1.3.0' } });
+    await waitFor(() => expect(screen.getByTestId('s').textContent).toBe('available:'));
+    // пользователь нажимает «Загрузить» — только тогда начинается downloading
+    hookRef!.download();
     emit({ event: 'download-progress', payload: { percent: 42 } });
     await waitFor(() => expect(screen.getByTestId('s').textContent).toBe('downloading:42'));
   });

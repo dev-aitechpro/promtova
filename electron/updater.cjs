@@ -19,8 +19,8 @@ const registerUpdater = (win, { ipcMain, app }, autoUpdaterOverride) => {
     if (win && !win.isDestroyed()) win.webContents.send('updater:event', { event, payload });
   };
 
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('checking-for-update', () => send('checking'));
   autoUpdater.on('update-available', (info) => send('update-available', { version: info && info.version }));
@@ -35,6 +35,9 @@ const registerUpdater = (win, { ipcMain, app }, autoUpdaterOverride) => {
     send('error', { message: (error && error.message) || String(error) }),
   );
 
+  ipcMain.handle('updater:download', () => {
+    return autoUpdater.downloadUpdate();
+  });
   ipcMain.handle('updater:install', () => {
     autoUpdater.quitAndInstall();
   });
