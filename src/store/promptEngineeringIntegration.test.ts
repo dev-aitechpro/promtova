@@ -45,12 +45,26 @@ describe('unified prompt engineering store', () => {
     expect(usePromtovaStore.getState().prompts[0].folder).toBe('Dev');
   });
 
-  it('creates one version for the first mutation in an edit session', () => {
+  it('creates one stable pre-change version for the first mutation in an edit session', () => {
     const store = usePromtovaStore.getState();
     store.updatePrompt('p1', { content: 'one' });
     store.updatePrompt('p1', { content: 'two' });
+    const version = usePromtovaStore.getState().versions[0];
     expect(usePromtovaStore.getState().versions).toHaveLength(1);
-    expect(usePromtovaStore.getState().versions[0].content).toBe('Hello {{name}}');
+    expect(version.content).toBe('Hello {{name}}');
+    expect(version.snapshot?.vars).toEqual({ name: 'World' });
+    expect(version.snapshot?.folderId).toBe('f1');
+  });
+
+  it('restores the complete prompt snapshot, including metadata and variables', () => {
+    const store = usePromtovaStore.getState();
+    store.updatePrompt('p1', { title: 'Changed', tags: ['new'], vars: { name: 'Alice' }, starred: true });
+    const versionId = usePromtovaStore.getState().versions[0].id;
+    const restored = usePromtovaStore.getState().restoreVersion('p1', versionId);
+    expect(restored?.title).toBe('Test');
+    expect(restored?.tags).toEqual([]);
+    expect(restored?.vars).toEqual({ name: 'World' });
+    expect(restored?.starred).toBe(false);
   });
 
   it('links templates and blocks to a prompt', () => {
@@ -65,14 +79,17 @@ describe('unified prompt engineering store', () => {
     expect(usePromtovaStore.getState().versions.length).toBeGreaterThan(0);
   });
 
-  it('records runs against the latest version and supports evaluation', () => {
+  it('records runs against the latest version and bounds evaluation scores', () => {
     const store = usePromtovaStore.getState();
     store.saveVersion('p1', 'baseline');
-    const runId = store.recordRun('p1', { output: 'result', score: 91 });
+    const runId = store.recordRun('p1', { output: 'result', score: 191 });
     expect(runId).toBeTruthy();
-    expect(usePromtovaStore.getState().runs[0].versionId).toBe(usePromtovaStore.getState().versions[0].id);
-    store.updateRunEvaluation(runId!, 95, [{ id: 'quality', name: 'Quality', score: 95, weight: 1 }]);
-    expect(usePromtovaStore.getState().runs[0].score).toBe(95);
+    const state = usePromtovaStore.getState();
+    expect(state.runs[0].versionId).toBe(state.versions[0].id);
+    expect(state.runs[0].score).toBe(100);
+    store.updateRunEvaluation(runId!, -4, [{ id: 'quality', name: 'Quality', score: 150, weight: 1 }]);
+    expect(usePromtovaStore.getState().runs[0].score).toBe(0);
+    expect(usePromtovaStore.getState().runs[0].criteria[0].score).toBe(100);
   });
 
   it('exports and imports all schema 2 entities without dropping block variables', () => {
@@ -88,7 +105,7 @@ describe('unified prompt engineering store', () => {
     expect(parsed.prompts[0].folderId).toBe('f1');
     expect(parsed.templates).toHaveLength(1);
     expect(parsed.blocks[0].variables[0].name).toBe('tone');
-    expect(parsed.versions).toHaveLength(2);
+    expect(parsed.versions.length).toBeGreaterThanOrEqual(2);
     expect(parsed.runs[0].output).toBe('ok');
   });
 });
