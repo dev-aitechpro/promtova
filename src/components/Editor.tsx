@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Button from './ui/Button';
 import { IconButton } from './ui/Button';
 import { usePromtovaStore, useUIStore } from '../store/usePromtovaStore';
@@ -13,6 +13,7 @@ const Editor = () => {
     selectedPromptId,
     prompts,
     folders,
+    tags,
     editorMode,
     setEditorMode,
     updatePrompt,
@@ -34,9 +35,18 @@ const Editor = () => {
   } = usePromtovaStore();
   const { pushToast } = useUIStore();
   const [tagInput, setTagInput] = useState('');
+  const [tagFocused, setTagFocused] = useState(false);
   const saveTimerRef = useRef<number | null>(null);
 
   const prompt = prompts.find((p) => p.id === selectedPromptId);
+
+  const availableTags = useMemo(() => tags.filter((t) => !prompt?.tags.includes(t.name)), [tags, prompt?.tags]);
+  const filteredTags = useMemo(() => {
+    const q = tagInput.trim().toLowerCase();
+    if (!q) return availableTags.slice(0, 12);
+    return availableTags.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 12);
+  }, [availableTags, tagInput]);
+  const showTagDropdown = tagFocused && filteredTags.length > 0;
 
   // Auto-save with debounce (отключаемая настройка — §8.3)
   useEffect(() => {
@@ -356,7 +366,7 @@ const Editor = () => {
         </div>
       </header>
 
-      {/* Tags row */}
+      {/* Tags row — с выбором существующих тегов без ручного ввода */}
       <div
         className="flex flex-wrap items-center gap-1.5 border-b px-6 py-2.5"
         style={{ borderColor: 'var(--border-subtle)' }}
@@ -381,25 +391,74 @@ const Editor = () => {
             </button>
           </span>
         ))}
-        <input
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && tagInput.trim()) {
-              addTagToPrompt(prompt.id, tagInput);
-              setTagInput('');
-            }
-          }}
-          placeholder="Добавить тег..."
-          className="rounded-md px-2 py-0.5 text-[11px] outline-none"
-          style={{
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            border: '1px dashed var(--border-primary)',
-            minWidth: '110px',
-          }}
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onFocus={() => setTagFocused(true)}
+            onBlur={() => setTimeout(() => setTagFocused(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && tagInput.trim()) {
+                addTagToPrompt(prompt.id, tagInput);
+                setTagInput('');
+              }
+              if (e.key === 'Escape') setTagFocused(false);
+            }}
+            placeholder="Добавить тег..."
+            className="rounded-md px-2 py-0.5 text-[11px] outline-none"
+            style={{
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              border: '1px dashed var(--border-primary)',
+              minWidth: '110px',
+            }}
+          />
+          {showTagDropdown && (
+            <div
+              className="absolute left-0 top-full z-20 mt-1 max-h-40 w-48 overflow-y-auto rounded-md border p-1 shadow-lg"
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-primary)', boxShadow: 'var(--shadow-md)' }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <div className="mb-1 px-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                {tagInput.trim() ? 'Найдено' : 'Существующие теги'} · клик чтобы добавить
+              </div>
+              {filteredTags.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    addTagToPrompt(prompt.id, t.name);
+                    setTagInput('');
+                    setTagFocused(false);
+                  }}
+                  className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-[11px] transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                >
+                  <span>#{t.name}</span>
+                  <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{t.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {availableTags.length > 0 && !tagFocused && !tagInput && (
+          <span className="hidden items-center gap-1 sm:inline-flex">
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>·</span>
+            {availableTags.slice(0, 6).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => addTagToPrompt(prompt.id, t.name)}
+                className="rounded px-1.5 py-0.5 text-[10px] font-mono transition-colors"
+                style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+                title={`Добавить #${t.name}`}
+              >
+                +#{t.name}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
 
       {/* Variables panel */}
