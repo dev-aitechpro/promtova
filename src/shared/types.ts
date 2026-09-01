@@ -1,10 +1,41 @@
-// Shared types for Promtova application
+// Shared domain types for Promtova.
 
-/**
- * Промпт идентифицируется строковым id (crypto.randomUUID).
- * Ранее использовались числовые `Date.now()` — они мигрируются в строки при гидрации (§4.3).
- */
 export type PromptId = string;
+
+export type PromptAssetType = 'prompt' | 'template' | 'skill' | 'knowledge' | 'tool' | 'agent' | 'block';
+
+export type PromptVariableType = 'string' | 'number' | 'boolean' | 'text' | 'select' | 'multiselect' | 'json';
+
+export interface PromptVariable {
+  name: string;
+  type: PromptVariableType;
+  description?: string;
+  defaultValue?: string | number | boolean | string[];
+  required?: boolean;
+  options?: string[];
+  pattern?: string;
+}
+
+export interface PromptSection {
+  id: string;
+  key: string;
+  label: string;
+  content: string;
+  order: number;
+  enabled?: boolean;
+}
+
+export interface PromptBlockReference {
+  blockId: string;
+  order: number;
+  overrides?: Record<string, string>;
+}
+
+export interface PromptDependency {
+  type: PromptAssetType;
+  id: string;
+  relation?: 'uses' | 'requires' | 'references' | 'derived-from';
+}
 
 export interface Prompt {
   id: PromptId;
@@ -14,7 +45,19 @@ export interface Prompt {
   path: string;
   content: string;
 
-  // Шаблонный режим (§4.1). Отсутствие полей = обычный режим, используется `content`.
+  // Canonical folder identity. `folder` remains only as a compatibility/display alias.
+  folderId?: string;
+  /** @deprecated Use folderId. Kept for backward-compatible storage/imports. */
+  folder: string;
+
+  // Flexible template schema.
+  sections?: PromptSection[];
+  templateId?: string;
+  blockRefs?: PromptBlockReference[];
+  dependencies?: PromptDependency[];
+  variableSchema?: Record<string, PromptVariable>;
+
+  // Legacy template fields kept for v1 compatibility.
   system?: string;
   context?: string;
   output?: string;
@@ -22,21 +65,95 @@ export interface Prompt {
 
   vars: Record<string, string>;
   starred: boolean;
-  folder: string; // название папки, напр. "ChatGPT"
   createdAt: string;
   updatedAt: string;
   usageCount: number;
 }
 
-/**
- * Папка имеет стабильный `id`. Поля `parent`/`children` хранят **id** других папок
- * (ранее — названия), поэтому переименование не ломает иерархию (§3.1, §3.6).
- */
+export interface PromptVersion {
+  id: string;
+  promptId: PromptId;
+  version: number;
+  createdAt: string;
+  note: string;
+  content: string;
+  sections: PromptSection[];
+  variables: PromptVariable[];
+  legacy: {
+    system?: string;
+    context?: string;
+    output?: string;
+    useTemplate?: boolean;
+  };
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+  sections: PromptSection[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptBlock {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  tags: string[];
+  variables: PromptVariable[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ModelProvider = 'ollama' | 'openai-compatible' | 'openrouter' | 'lm-studio' | 'custom-http';
+
+export interface ModelProfile {
+  id: string;
+  name: string;
+  provider: ModelProvider;
+  model: string;
+  baseUrl?: string;
+  apiKeyRef?: string;
+  capabilities?: string[];
+  params?: Record<string, unknown>;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvaluationCriterion {
+  id: string;
+  name: string;
+  score?: number;
+  weight?: number;
+  rationale?: string;
+}
+
+export interface PromptRun {
+  id: string;
+  promptId: PromptId;
+  versionId?: string;
+  modelProfileId?: string;
+  createdAt: string;
+  input: Record<string, unknown>;
+  output: string;
+  score?: number;
+  criteria: EvaluationCriterion[];
+  latencyMs?: number;
+  tokenUsage?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+}
+
 export interface Folder {
   id: string;
   name: string;
-  parent: string | null; // id родительской папки
-  children: string[]; // id дочерних папок
+  parent: string | null;
+  children: string[];
   icon?: string;
   color?: string;
   order: number;
@@ -56,16 +173,18 @@ export interface CustomTheme {
   colors: Record<string, string>;
 }
 
-/** Формат файла экспорта `.prmt` (§5.2 — включает папки). */
 export interface ExportData {
   version: string;
   exportedAt: string;
   prompts: Prompt[];
   folders: Folder[];
+  versions?: PromptVersion[];
+  templates?: PromptTemplate[];
+  blocks?: PromptBlock[];
+  modelProfiles?: ModelProfile[];
+  runs?: PromptRun[];
 }
 
 export type EditorMode = 'view' | 'edit' | 'split';
 export type SortKey = 'updated' | 'created' | 'title' | 'usage';
-
-/** Разрешение конфликта при импорте (§5.1). */
 export type MergeAction = 'skip' | 'rename' | 'overwrite' | 'duplicate';
