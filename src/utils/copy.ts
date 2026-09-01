@@ -1,10 +1,10 @@
 // Копирование промпта в буфер обмена (§7.2).
 import type { Prompt } from '../shared/types';
-import { getPromptText, substituteVariables } from './promtova';
+import { getPromptText as resolvePromptTextForRuntime, substituteVariables } from './promtova';
 
-/** Текст промпта для копирования; при `substitute` переменные подставляются. */
+/** Текст промпта для копирования; всегда использует текущий resolved graph. */
 export const promptTextForCopy = (p: Prompt, substitute: boolean): string => {
-  const text = getPromptText(p);
+  const text = resolvePromptTextForRuntime(p);
   return substitute ? substituteVariables(text, p.vars) : text;
 };
 

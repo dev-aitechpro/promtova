@@ -1,22 +1,34 @@
 // Variable substitution & content utilities
 import type { Prompt, PromptId } from '../shared/types';
 
+type PromptTextResolver = (prompt: Prompt) => string;
+let runtimePromptTextResolver: PromptTextResolver | null = null;
+
+/** Register the application-level resolver used by Editor/Search/Copy. */
+export const setPromptTextResolver = (resolver: PromptTextResolver | null): void => {
+  runtimePromptTextResolver = resolver;
+};
+
+/** Legacy prompt text resolution that does not require store context. */
+export const getLegacyPromptText = (p: Prompt): string => {
+  if (p.useTemplate) {
+    return [p.system, p.context, p.output].filter((s) => s && s.trim()).join('\n\n');
+  }
+  return p.content ?? '';
+};
+
+/**
+ * Resolved prompt text. When the app store is available, this resolves
+ * template -> sections -> blocks; otherwise it falls back to legacy fields.
+ */
+export const getPromptText = (p: Prompt): string =>
+  runtimePromptTextResolver ? runtimePromptTextResolver(p) : getLegacyPromptText(p);
+
 /** Устойчивый id: crypto.randomUUID с фолбэком для окружений без Web Crypto (§4.3). */
 export const newId = (): PromptId => {
   const c = globalThis.crypto;
   if (c && typeof c.randomUUID === 'function') return c.randomUUID();
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-};
-
-/**
- * Единый источник текста промпта (§4.1).
- * Обычный режим — `content`; шаблонный — склейка system/context/output.
- */
-export const getPromptText = (p: Prompt): string => {
-  if (p.useTemplate) {
-    return [p.system, p.context, p.output].filter((s) => s && s.trim()).join('\n\n');
-  }
-  return p.content ?? '';
 };
 
 export const substituteVariables = (
