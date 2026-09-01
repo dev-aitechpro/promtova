@@ -64,6 +64,22 @@ export interface Prompt {
 
 export type PromptVersionSnapshot = Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>;
 
+export interface PromptVersionBlockSnapshot {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  tags: string[];
+  variables: PromptVariable[];
+}
+
+export interface PromptVersionTemplateSnapshot {
+  id: string;
+  name: string;
+  description: string;
+  sections: PromptSection[];
+}
+
 export interface PromptVersion {
   id: string;
   promptId: PromptId;
@@ -72,6 +88,12 @@ export interface PromptVersion {
   note: string;
   /** Complete prompt state at the time of the snapshot. Added in schema v2. */
   snapshot?: PromptVersionSnapshot;
+  /** Exact resolved text at snapshot time, independent of later block/template edits. */
+  resolvedText?: string;
+  /** Immutable template state referenced by the prompt at snapshot time. */
+  templateSnapshot?: PromptVersionTemplateSnapshot;
+  /** Immutable block states referenced by the prompt at snapshot time. */
+  blockSnapshots?: PromptVersionBlockSnapshot[];
   /** Legacy v1 snapshot fields kept for backward compatibility. */
   content: string;
   sections: PromptSection[];
