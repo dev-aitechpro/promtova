@@ -5,7 +5,7 @@ import { usePromtovaStore, useUIStore } from '../../store/usePromtovaStore';
 import { buildExportData } from '../../utils/importExport';
 import { saveTextFile } from '../../utils/fileBridge';
 import { folderPath, getDescendantIds, getSiblings } from '../../utils/folders';
-import type { ExportData, Folder, Prompt } from '../../shared/types';
+import type { ExportData, Folder } from '../../shared/types';
 import { Download, Check } from 'lucide-react';
 
 const ExportModal = () => {
@@ -43,10 +43,11 @@ const ExportModal = () => {
 
     const allowedFolderIds = new Set(allowedFolders.map((folder) => folder.id));
     const allowedPromptIds = new Set(
-      prompts.filter((prompt) => prompt.folderId ? allowedFolderIds.has(prompt.folderId) : allowedFolders.some((folder) => folder.name === prompt.folder)).map((prompt) => prompt.id),
+      prompts
+        .filter((prompt) => prompt.folderId ? allowedFolderIds.has(prompt.folderId) : allowedFolders.some((folder) => folder.name === prompt.folder))
+        .map((prompt) => prompt.id),
     );
     const scopedPrompts = prompts.filter((prompt) => allowedPromptIds.has(prompt.id));
-
     const versions = allData.versions.filter((version) => allowedPromptIds.has(version.promptId));
     const runs = allData.runs.filter((run) => allowedPromptIds.has(run.promptId));
     const referencedTemplateIds = new Set(scopedPrompts.map((prompt) => prompt.templateId).filter((id): id is string => Boolean(id)));
