@@ -3,7 +3,6 @@
 export type PromptId = string;
 
 export type PromptAssetType = 'prompt' | 'template' | 'skill' | 'knowledge' | 'tool' | 'agent' | 'block';
-
 export type PromptVariableType = 'string' | 'number' | 'boolean' | 'text' | 'select' | 'multiselect' | 'json';
 
 export interface PromptVariable {
@@ -44,25 +43,18 @@ export interface Prompt {
   preview: string;
   path: string;
   content: string;
-
-  // Canonical folder identity. `folder` remains only as a compatibility/display alias.
   folderId?: string;
   /** @deprecated Use folderId. Kept for backward-compatible storage/imports. */
   folder: string;
-
-  // Flexible template schema.
   sections?: PromptSection[];
   templateId?: string;
   blockRefs?: PromptBlockReference[];
   dependencies?: PromptDependency[];
   variableSchema?: Record<string, PromptVariable>;
-
-  // Legacy template fields kept for v1 compatibility.
   system?: string;
   context?: string;
   output?: string;
   useTemplate?: boolean;
-
   vars: Record<string, string>;
   starred: boolean;
   createdAt: string;
@@ -70,12 +62,17 @@ export interface Prompt {
   usageCount: number;
 }
 
+export type PromptVersionSnapshot = Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>;
+
 export interface PromptVersion {
   id: string;
   promptId: PromptId;
   version: number;
   createdAt: string;
   note: string;
+  /** Complete prompt state at the time of the snapshot. Added in schema v2. */
+  snapshot?: PromptVersionSnapshot;
+  /** Legacy v1 snapshot fields kept for backward compatibility. */
   content: string;
   sections: PromptSection[];
   variables: PromptVariable[];
