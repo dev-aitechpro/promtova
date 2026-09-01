@@ -1,12 +1,15 @@
 import type {
   EvaluationCriterion,
+  Folder,
   ModelProfile,
   Prompt,
+  PromptAssetType,
   PromptBlock,
   PromptRun,
   PromptSection,
   PromptTemplate,
   PromptVariable,
+  PromptVariableType,
   PromptVersion,
 } from '../shared/types';
 import { newId } from './promtova';
@@ -72,12 +75,23 @@ export const normalizeVariableSchema = (
     return Object.fromEntries(
       variables
         .filter((v) => v && typeof v.name === 'string' && v.name.trim())
-        .map((v) => [v.name, { ...v, name: v.name.trim() }]),
+        .map((v) => [v.name.trim(), { ...v, name: v.name.trim() }]),
     );
   }
   return Object.fromEntries(
     Object.entries(variables).map(([name, value]) => [name, { ...value, name: value.name || name }]),
   );
+};
+
+export const canonicalizePromptFolders = (prompts: Prompt[], folders: Folder[]): Prompt[] => {
+  const foldersById = new Set(folders.map((folder) => folder.id));
+  const idsByName = new Map(folders.map((folder) => [folder.name, folder.id]));
+  return prompts.map((prompt) => ({
+    ...prompt,
+    folderId: prompt.folderId && foldersById.has(prompt.folderId)
+      ? prompt.folderId
+      : idsByName.get(prompt.folder) ?? undefined,
+  }));
 };
 
 export const createPromptBlock = (name: string, content = '', description = ''): PromptBlock => {
@@ -157,3 +171,15 @@ export const evaluateCriterion = (
   score: clampScore(score),
   rationale,
 });
+
+export const asPromptAssetType = (value: unknown): PromptAssetType | null => {
+  const allowed: PromptAssetType[] = ['prompt', 'template', 'skill', 'knowledge', 'tool', 'agent', 'block'];
+  return typeof value === 'string' && allowed.includes(value as PromptAssetType) ? value as PromptAssetType : null;
+};
+
+export const asPromptVariableType = (value: unknown): PromptVariableType => {
+  const allowed: PromptVariableType[] = ['string', 'number', 'boolean', 'text', 'select', 'multiselect', 'json'];
+  return typeof value === 'string' && allowed.includes(value as PromptVariableType)
+    ? value as PromptVariableType
+    : 'string';
+};
