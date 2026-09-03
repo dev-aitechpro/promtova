@@ -246,9 +246,53 @@ select:focus-visible,
   line-height: 1.7;
   tab-size: 2;
   caret-color: var(--accent-primary);
+  /* Безопасная зона: длинные строки переносятся внутри поля и не растягивают layout */
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .editor-textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* ============= Safe zone: контент промпта не растягивает layout ============= */
+/* Живое превью пересчитывается на каждый ввод — длинные слова/таблицы/код
+   обязаны переноситься или скроллиться внутри своей панели, а не раздвигать
+   flex-контейнеры за пределы экрана. */
+.md-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.md-body p,
+.md-body li,
+.md-body h1, .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6,
+.md-body blockquote,
+.md-body td, .md-body th {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.md-body a,
+.md-body code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.md-body pre {
+  max-width: 100%;
+}
+.md-body table {
+  /* блочный скролл вместо растягивания: таблица не выходит за границы панели */
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.md-body .var-token {
+  max-width: 100%;
+  word-break: break-all;
 }
 
 /* Markdown rendering inside editor preview */

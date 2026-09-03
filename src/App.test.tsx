@@ -59,6 +59,23 @@ describe('App (smoke)', () => {
     const header = screen.getByPlaceholderText('Название промпта');
     expect(header).toHaveValue('Code Review Assistant');
   });
+
+  it('редактор имеет безопасную зону и не растягивает layout (min-w-0)', () => {
+    resetStores();
+    const { container } = render(<App />);
+    const editor = container.querySelector('section.flex-1');
+    expect(editor).not.toBeNull();
+    expect((editor as HTMLElement).className).toContain('min-w-0');
+  });
+
+  it('модалки ограничены шириной экрана (max-width 100%)', () => {
+    resetStores();
+    useUIStore.getState().openSettings();
+    const { container } = render(<App />);
+    const dialog = container.querySelector('.animate-scale-in') as HTMLElement | null;
+    expect(dialog).not.toBeNull();
+    expect(dialog!.style.maxWidth).toBe('100%');
+  });
 });
 
 describe('горячие клавиши (§8.1)', () => {

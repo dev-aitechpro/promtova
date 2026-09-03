@@ -203,17 +203,17 @@ const Editor = () => {
   const previewHtml = renderMarkdown(substituteVariables(fullText, prompt.vars));
   const previewEl = (extraClass = '') => (
     <div
-      className={`md-body ${extraClass}`}
+      className={`md-body min-w-0 max-w-full ${extraClass}`}
       style={{ color: 'var(--editor-text)' }}
       dangerouslySetInnerHTML={{ __html: previewHtml }}
     />
   );
 
   return (
-    <section className="flex h-full flex-1 flex-col" style={{ background: 'var(--bg-primary)' }}>
+    <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* Editor Header */}
       <header
-        className="flex items-center justify-between border-b px-6 py-3.5"
+        className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-6 py-3.5"
         style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-panel)' }}
       >
         <div className="flex min-w-0 flex-1 flex-col">
@@ -487,36 +487,36 @@ const Editor = () => {
               Очистить лишние
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid min-w-0 grid-cols-2 gap-2">
             {vars.map((v) => {
               const defined = prompt.vars[v] !== undefined && prompt.vars[v] !== '';
               return (
                 <div
                   key={v}
-                  className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5"
+                  className="flex min-w-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5"
                   style={{
                     background: 'var(--bg-elevated)',
                     borderColor: defined ? 'var(--border-subtle)' : 'rgba(229, 107, 111, 0.35)',
                   }}
                 >
                   <span
-                    className="font-mono text-[11px] font-medium"
+                    className="min-w-0 break-all font-mono text-[11px] font-medium"
                     style={{ color: 'var(--accent-primary)' }}
                   >
                     {`{{${v}}}`}
                   </span>
-                  <ArrowLeft size={10} style={{ color: 'var(--text-muted)' }} />
+                  <ArrowLeft size={10} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
                   <input
                     type="text"
                     value={prompt.vars[v] || ''}
                     onChange={(e) => setVar(prompt.id, v, e.target.value)}
                     placeholder="значение…"
-                    className="flex-1 bg-transparent text-[11.5px] outline-none"
+                    className="min-w-0 flex-1 bg-transparent text-[11.5px] outline-none"
                     style={{ color: 'var(--text-primary)' }}
                   />
                   {!defined && (
                     <span
-                      className="rounded px-1.5 py-0.5 text-[9px] font-mono"
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono"
                       style={{ background: 'rgba(229, 107, 111, 0.15)', color: 'var(--status-error)' }}
                     >
                       не заполнено
@@ -529,11 +529,11 @@ const Editor = () => {
         </div>
       )}
 
-      {/* Editor body */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Editor body — min-w-0/min-h-0 не дают контенту растягивать весь layout */}
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {isTemplate ? (
           // Шаблонный режим: три логических блока (§4.1)
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="min-w-0 flex-1 overflow-y-auto px-6 py-4">
             {editorMode === 'view' ? (
               previewEl('')
             ) : (
@@ -562,7 +562,7 @@ const Editor = () => {
                       onChange={(e) => handleTemplateChange(f.key, e.target.value)}
                       spellCheck={false}
                       placeholder="Переменные вида {{имя}} поддерживаются"
-                      className="editor-textarea w-full resize-y rounded-md border px-3 py-2.5 outline-none"
+                      className="editor-textarea min-w-0 w-full max-w-full resize-y rounded-md border px-3 py-2.5 outline-none"
                       style={{
                         background: 'var(--editor-bg)',
                         color: 'var(--editor-text)',
@@ -587,13 +587,13 @@ const Editor = () => {
           </div>
         ) : editorMode === 'split' ? (
           <>
-            <div className="flex-1 overflow-y-auto border-r" style={{ borderColor: 'var(--border-subtle)' }}>
+            <div className="min-w-0 flex-1 overflow-y-auto border-r" style={{ borderColor: 'var(--border-subtle)' }}>
               <textarea
                 value={prompt.content}
                 onChange={(e) => handleContentChange(e.target.value)}
                 spellCheck={false}
                 aria-label="Текст промпта"
-                className="editor-textarea h-full w-full resize-none px-6 py-5 outline-none"
+                className="editor-textarea h-full w-full min-w-0 max-w-full resize-none px-6 py-5 outline-none"
                 style={{
                   background: 'var(--editor-bg)',
                   color: 'var(--editor-text)',
@@ -602,7 +602,7 @@ const Editor = () => {
                 }}
               />
             </div>
-            <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-primary)' }}>
+            <div className="min-w-0 flex-1 overflow-y-auto" style={{ background: 'var(--bg-primary)' }}>
               <div className="px-6 py-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 Превью · Markdown
               </div>
@@ -610,14 +610,14 @@ const Editor = () => {
             </div>
           </>
         ) : (
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-w-0 flex-1 overflow-y-auto">
             {editorMode === 'edit' ? (
               <textarea
                 value={prompt.content}
                 onChange={(e) => handleContentChange(e.target.value)}
                 spellCheck={false}
                 aria-label="Текст промпта"
-                className="editor-textarea h-full w-full resize-none px-6 py-5 outline-none"
+                className="editor-textarea h-full w-full min-w-0 max-w-full resize-none px-6 py-5 outline-none"
                 style={{
                   background: 'var(--editor-bg)',
                   color: 'var(--editor-text)',

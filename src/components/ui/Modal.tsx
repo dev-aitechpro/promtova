@@ -25,6 +25,7 @@ const Modal = ({
         className="animate-scale-in flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border"
         style={{
           width,
+          maxWidth: '100%',
           background: 'var(--bg-elevated)',
           borderColor: 'var(--border-primary)',
           boxShadow: 'var(--shadow-lg)',
